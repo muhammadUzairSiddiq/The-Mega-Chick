@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   respawnDelay: 2
   invulnerableSeconds: 3
+  spawnProtectionDuration: 1
   showRespawnCountdown: 1
   fadeInDuration: 1
   allowCancelRespawn: 0

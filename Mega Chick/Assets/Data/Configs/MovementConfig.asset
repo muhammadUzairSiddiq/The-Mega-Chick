@@ -20,6 +20,8 @@ MonoBehaviour:
   attackCooldown: 0.5
   attackRange: 1.5
   attackDamage: 1
+  weaponKnockbackPower: 15
+  weaponCooldown: 4
   groundCheckDistance: 0.1
   groundCheckRadius: 0.3
   groundLayerMask:

@@ -130,6 +130,9 @@ public class SpawnManager : MonoBehaviourPunCallbacks
             new object[] { player.ActorNumber }
         );
         
+        // Apply character selection
+        ApplyCharacterToPlayer(playerObj, player);
+        
         Log($"Spawned player {player.ActorNumber} at {spawnPoint.position}");
     }
     
@@ -192,6 +195,23 @@ public class SpawnManager : MonoBehaviourPunCallbacks
             }
         }
         return null;
+    }
+    
+    /// <summary>
+    /// Apply character selection to spawned player.
+    /// </summary>
+    private void ApplyCharacterToPlayer(GameObject playerObj, Photon.Realtime.Player player)
+    {
+        if (CharacterSelectionManager.Instance == null) return;
+        
+        CharacterData characterData = CharacterSelectionManager.Instance.GetCharacterData(player);
+        if (characterData == null) return;
+        
+        PlayerVisual playerVisual = playerObj.GetComponent<PlayerVisual>();
+        if (playerVisual != null)
+        {
+            playerVisual.SetCharacter(characterData);
+        }
     }
     
     /// <summary>

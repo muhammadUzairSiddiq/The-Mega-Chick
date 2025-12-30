@@ -36,6 +36,12 @@ public class CreateDefaultConfigs : EditorWindow
         // Create RaceConfig
         CreateConfigIfNotExists<RaceConfig>(configPath, "RaceConfig");
         
+        // Create TransformationConfig
+        CreateConfigIfNotExists<TransformationConfig>(configPath, "TransformationConfig");
+        
+        // Create ModeSpecificConfig
+        CreateConfigIfNotExists<ModeSpecificConfig>(configPath, "ModeSpecificConfig");
+        
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         

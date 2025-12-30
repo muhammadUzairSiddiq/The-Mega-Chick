@@ -21,5 +21,6 @@ MonoBehaviour:
   raceTimeLimit: 0
   respawnAtLastCheckpoint: 1
   allowRespawn: 1
+  allPlayersTransformed: 1
   rankByProgress: 1
   minProgressToRank: 0

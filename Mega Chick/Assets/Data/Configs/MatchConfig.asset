@@ -14,7 +14,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   countdownSeconds: 3
   defaultRoundSeconds: 300
-  minPlayersToStart: 2
+  minPlayersToStart: 1
   allowRematch: 1
   resultsDisplayDuration: 10
   autoStartWhenReady: 0
+  respawnDelay: 2

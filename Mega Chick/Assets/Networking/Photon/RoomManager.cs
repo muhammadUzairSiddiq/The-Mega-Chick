@@ -17,8 +17,14 @@ public class RoomManager : MonoBehaviourPunCallbacks
     
     [Header("Debug")]
     [SerializeField] private bool logRoomEvents = true;
+    [SerializeField] private bool verboseLogging = true;
     
     private string currentRoomCode;
+    private string currentRoomName;
+    private List<RoomInfo> cachedRoomList = new List<RoomInfo>();
+    
+    // Event for room list updates
+    public System.Action<List<RoomInfo>> OnRoomListUpdated;
     
     private void Awake()
     {
@@ -41,13 +47,28 @@ public class RoomManager : MonoBehaviourPunCallbacks
         int length = networkConfig != null ? networkConfig.roomCodeLength : 6;
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
         string code = "";
-        
+
         for (int i = 0; i < length; i++)
         {
             code += chars[Random.Range(0, chars.Length)];
         }
-        
+
         return code;
+    }
+    
+    /// <summary>
+    /// Generate a friendly room name (different from room code).
+    /// </summary>
+    public string GenerateRoomName()
+    {
+        string[] adjectives = { "Epic", "Mega", "Super", "Ultra", "Awesome", "Cool", "Fast", "Wild", "Crazy", "Fun" };
+        string[] nouns = { "Arena", "Battle", "Match", "Game", "Room", "Lobby", "Zone", "Stage", "Ring", "Field" };
+        
+        string adjective = adjectives[Random.Range(0, adjectives.Length)];
+        string noun = nouns[Random.Range(0, nouns.Length)];
+        int number = Random.Range(1, 100);
+        
+        return $"{adjective} {noun} {number}";
     }
     
     /// <summary>
@@ -55,20 +76,31 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// </summary>
     public void CreateRoom()
     {
-        if (!PhotonNetwork.IsConnectedAndReady)
+        LogState("🚀 [ACTION] CreateRoom() called");
+        
+        bool isConnected = PhotonNetwork.IsConnectedAndReady;
+        LogState($"🔌 [CHECK] IsConnectedAndReady: {isConnected}");
+        
+        if (!isConnected)
         {
-            Log("Not connected! Connect first.");
+            LogState("❌ [ERROR] Not connected! Connect first.");
             return;
         }
         
-        if (PhotonNetwork.InRoom)
+        bool inRoom = PhotonNetwork.InRoom;
+        LogState($"🏠 [CHECK] Already in room: {inRoom}");
+        
+        if (inRoom)
         {
-            Log("Already in a room!");
+            LogState("⚠️ [WARN] Already in a room! Leaving first...");
+            PhotonNetwork.LeaveRoom();
+            // Wait for OnLeftRoom callback before creating new room
             return;
         }
         
         currentRoomCode = GenerateRoomCode();
-        Log($"Creating room: {currentRoomCode}");
+        currentRoomName = GenerateRoomName();
+        LogState($"🔤 [GENERATE] Room code: {currentRoomCode}, Room name: {currentRoomName}");
         
         RoomOptions roomOptions = new RoomOptions
         {
@@ -77,7 +109,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
             IsOpen = networkConfig != null ? networkConfig.isOpen : true
         };
         
-        PhotonNetwork.CreateRoom(currentRoomCode, roomOptions);
+        LogState($"⚙️ [OPTIONS] MaxPlayers: {roomOptions.MaxPlayers} | Visible: {roomOptions.IsVisible} | Open: {roomOptions.IsOpen}");
+        LogState($"🚀 [PHOTON] Calling PhotonNetwork.CreateRoom({currentRoomCode})...");
+        
+        bool success = PhotonNetwork.CreateRoom(currentRoomCode, roomOptions);
+        LogState($"✅ [PHOTON] CreateRoom returned: {success}");
     }
     
     /// <summary>
@@ -85,26 +121,38 @@ public class RoomManager : MonoBehaviourPunCallbacks
     /// </summary>
     public void JoinRoom(string roomCode)
     {
+        LogState("🚀 [ACTION] JoinRoom() called");
+        LogState($"📝 [INPUT] Room code: '{roomCode}'");
+        
         if (string.IsNullOrEmpty(roomCode))
         {
-            Log("Room code is empty!");
+            LogState("❌ [ERROR] Room code is empty!");
             return;
         }
         
-        if (!PhotonNetwork.IsConnectedAndReady)
+        bool isConnected = PhotonNetwork.IsConnectedAndReady;
+        LogState($"🔌 [CHECK] IsConnectedAndReady: {isConnected}");
+        
+        if (!isConnected)
         {
-            Log("Not connected! Connect first.");
+            LogState("❌ [ERROR] Not connected! Connect first.");
             return;
         }
         
-        if (PhotonNetwork.InRoom)
+        bool inRoom = PhotonNetwork.InRoom;
+        LogState($"🏠 [CHECK] Already in room: {inRoom}");
+        
+        if (inRoom)
         {
-            Log("Already in a room! Leave first.");
+            LogState("⚠️ [WARN] Already in a room! Leaving first...");
+            PhotonNetwork.LeaveRoom();
+            // Wait for OnLeftRoom callback
             return;
         }
         
-        Log($"Joining room: {roomCode}");
-        PhotonNetwork.JoinRoom(roomCode);
+        LogState($"🚀 [PHOTON] Calling PhotonNetwork.JoinRoom({roomCode})...");
+        bool success = PhotonNetwork.JoinRoom(roomCode);
+        LogState($"✅ [PHOTON] JoinRoom returned: {success}");
     }
     
     /// <summary>
@@ -120,6 +168,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     
     public bool IsMasterClient() => PhotonNetwork.IsMasterClient;
     public string GetCurrentRoomCode() => currentRoomCode;
+    public string GetCurrentRoomName() => currentRoomName;
     public int GetPlayerCount() => PhotonNetwork.CurrentRoom != null ? PhotonNetwork.CurrentRoom.PlayerCount : 0;
     public int GetMaxPlayers() => PhotonNetwork.CurrentRoom != null ? PhotonNetwork.CurrentRoom.MaxPlayers : 0;
     public List<Player> GetPlayerList() => new List<Player>(PhotonNetwork.PlayerList);
@@ -127,51 +176,132 @@ public class RoomManager : MonoBehaviourPunCallbacks
     // Photon Callbacks
     public override void OnCreatedRoom()
     {
-        Log($"Room created: {PhotonNetwork.CurrentRoom.Name}");
+        string roomName = PhotonNetwork.CurrentRoom != null ? PhotonNetwork.CurrentRoom.Name : "UNKNOWN";
+        LogState($"🎉 [CALLBACK] OnCreatedRoom fired!");
+        LogState($"🏠 [ROOM] Room created: {roomName}");
+        LogState($"👑 [ROOM] Is Master Client: {PhotonNetwork.IsMasterClient}");
+        LogState($"👥 [ROOM] Player count: {GetPlayerCount()}/{GetMaxPlayers()}");
+        
+        // NOTE: OnCreatedRoom fires BEFORE OnJoinedRoom
+        // The creator is automatically in the room, OnJoinedRoom will fire next
+        LogState("⏳ [WAIT] Waiting for OnJoinedRoom callback (creator auto-joins)...");
     }
     
     public override void OnCreateRoomFailed(short returnCode, string message)
     {
-        Log($"Failed to create room: {message}");
+        LogState($"❌ [CALLBACK] OnCreateRoomFailed fired!");
+        LogState($"❌ [ERROR] Return Code: {returnCode}");
+        LogState($"❌ [ERROR] Message: {message}");
+        GameEventBus.FireCreateRoomFailed(message);
     }
     
     public override void OnJoinedRoom()
     {
+        if (PhotonNetwork.CurrentRoom == null)
+        {
+            LogState("❌ [ERROR] CurrentRoom is NULL in OnJoinedRoom!");
+            return;
+        }
+        
         currentRoomCode = PhotonNetwork.CurrentRoom.Name;
-        Log($"Joined room: {currentRoomCode} ({GetPlayerCount()}/{GetMaxPlayers()} players)");
+        // If room name not set, generate one
+        if (string.IsNullOrEmpty(currentRoomName))
+        {
+            currentRoomName = GenerateRoomName();
+        }
+        int playerCount = GetPlayerCount();
+        int maxPlayers = GetMaxPlayers();
+        bool isMaster = PhotonNetwork.IsMasterClient;
+        
+        LogState($"🎉 [CALLBACK] OnJoinedRoom fired!");
+        LogState($"🏠 [ROOM] Room Code: {currentRoomCode}");
+        LogState($"👥 [ROOM] Players: {playerCount}/{maxPlayers}");
+        LogState($"👑 [ROOM] Is Master Client: {(isMaster ? "YES ✅" : "NO")}");
+        LogState($"✅ [ROOM] Successfully joined room!");
+        
         GameEventBus.FireJoinedRoom();
     }
     
     public override void OnJoinRoomFailed(short returnCode, string message)
     {
-        Log($"Failed to join room: {message}");
+        LogState($"❌ [CALLBACK] OnJoinRoomFailed fired!");
+        LogState($"❌ [ERROR] Return Code: {returnCode}");
+        LogState($"❌ [ERROR] Message: {message}");
+        
+        // Common error codes:
+        // 32760 = Room not found
+        // 32758 = Room full
+        // 32757 = Room closed
+        
+        string errorMsg = "";
+        switch (returnCode)
+        {
+            case 32760:
+                errorMsg = "Room not found! Check the room code.";
+                break;
+            case 32758:
+                errorMsg = "Room is full!";
+                break;
+            case 32757:
+                errorMsg = "Room is closed!";
+                break;
+            default:
+                errorMsg = $"Failed to join: {message}";
+                break;
+        }
+        
+        LogState($"❌ [ERROR] {errorMsg}");
+        GameEventBus.FireJoinRoomFailed(errorMsg);
     }
     
     public override void OnLeftRoom()
     {
-        Log("Left room");
+        LogState("🎉 [CALLBACK] OnLeftRoom fired!");
+        LogState("🏠 [ROOM] Left room");
         currentRoomCode = null;
+        currentRoomName = null;
         GameEventBus.FireLeftRoom();
     }
     
     public override void OnPlayerEnteredRoom(Player newPlayer)
     {
-        Log($"Player entered: {newPlayer.ActorNumber}");
+        LogState($"🎉 [CALLBACK] OnPlayerEnteredRoom fired!");
+        LogState($"👤 [PLAYER] Player entered: {newPlayer.ActorNumber} ({newPlayer.NickName})");
         GameEventBus.FirePlayerEnteredRoom(newPlayer.ActorNumber.ToString());
     }
     
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
-        Log($"Player left: {otherPlayer.ActorNumber}");
+        LogState($"🎉 [CALLBACK] OnPlayerLeftRoom fired!");
+        LogState($"👤 [PLAYER] Player left: {otherPlayer.ActorNumber} ({otherPlayer.NickName})");
         GameEventBus.FirePlayerLeftRoom(otherPlayer.ActorNumber.ToString());
     }
     
     public override void OnMasterClientSwitched(Player newMasterClient)
     {
-        Log($"Master client switched to: {newMasterClient.ActorNumber}");
+        LogState($"🎉 [CALLBACK] OnMasterClientSwitched fired!");
+        LogState($"👑 [MASTER] Master client switched to: {newMasterClient.ActorNumber} ({newMasterClient.NickName})");
     }
     
-    private void Log(string message)
+    /// <summary>
+    /// Get cached room list.
+    /// </summary>
+    public List<RoomInfo> GetRoomList()
+    {
+        return new List<RoomInfo>(cachedRoomList);
+    }
+    
+    /// <summary>
+    /// Photon callback when room list updates.
+    /// </summary>
+    public override void OnRoomListUpdate(List<RoomInfo> roomList)
+    {
+        LogState($"🎉 [CALLBACK] OnRoomListUpdate fired! {roomList.Count} rooms");
+        cachedRoomList = roomList;
+        OnRoomListUpdated?.Invoke(roomList);
+    }
+    
+    private void LogState(string message)
     {
         if (logRoomEvents)
         {

@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0cb594f81c8087e49a1b58ab57271b65, type: 3}
+  m_Name: TransformationConfig
+  m_EditorClassIdentifier: 
+  transformationPointsRequired: 20
+  enableTransformation: 1
+  pointsForAttacked: 2
+  pointsForKnockedDown: 5
+  pointsForAttacking: 1
+  pointsForKnockingDown: 3
+  showTransformationBar: 1

@@ -16,6 +16,8 @@ public static class GameEventBus
     // Room Events
     public static event Action OnJoinedRoom;
     public static event Action OnLeftRoom;
+    public static event Action<string> OnJoinRoomFailed; // error message
+    public static event Action<string> OnCreateRoomFailed; // error message
     public static event Action<string> OnPlayerEnteredRoom; // actorNumber
     public static event Action<string> OnPlayerLeftRoom; // actorNumber
     
@@ -37,6 +39,8 @@ public static class GameEventBus
     public static void FireLeftLobby() => OnLeftLobby?.Invoke();
     public static void FireJoinedRoom() => OnJoinedRoom?.Invoke();
     public static void FireLeftRoom() => OnLeftRoom?.Invoke();
+    public static void FireJoinRoomFailed(string errorMessage) => OnJoinRoomFailed?.Invoke(errorMessage);
+    public static void FireCreateRoomFailed(string errorMessage) => OnCreateRoomFailed?.Invoke(errorMessage);
     public static void FirePlayerEnteredRoom(string actorNumber) => OnPlayerEnteredRoom?.Invoke(actorNumber);
     public static void FirePlayerLeftRoom(string actorNumber) => OnPlayerLeftRoom?.Invoke(actorNumber);
     public static void FireMatchStateChanged() => OnMatchStateChanged?.Invoke();

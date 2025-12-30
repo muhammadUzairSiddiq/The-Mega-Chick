@@ -77,11 +77,9 @@ public class NetworkBootstrap : MonoBehaviourPunCallbacks
         Log("Connected to Photon Master Server");
         GameEventBus.FireConnectedToMaster();
         
-        // Auto-join lobby if configured
-        if (PhotonNetwork.NetworkingClient.EnableLobbyStatistics)
-        {
-            PhotonNetwork.JoinLobby();
-        }
+        // ALWAYS join lobby - required for room operations
+        Log("Joining Lobby (required for room operations)...");
+        PhotonNetwork.JoinLobby();
     }
     
     public override void OnDisconnected(DisconnectCause cause)
