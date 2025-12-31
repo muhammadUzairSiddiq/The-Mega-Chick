@@ -330,11 +330,26 @@ public class GameModeSelectionUI : MonoBehaviour
         if (GameModeSelectionManager.Instance != null)
         {
             GameModeSelectionManager.Instance.SelectGameMode(selectedModeIndex);
-            LogState($"✅ [STORE] Game mode selection stored in Photon properties");
+            LogState($"✅ [STORE] Game mode selection stored in Photon player properties");
         }
         else
         {
             LogState("⚠️ [WARN] GameModeSelectionManager.Instance is NULL! Selection not stored.");
+        }
+        
+        // Store game mode in room properties (so all players can see it in room list)
+        if (PhotonNetwork.InRoom && PhotonNetwork.IsMasterClient)
+        {
+            ExitGames.Client.Photon.Hashtable roomProps = new ExitGames.Client.Photon.Hashtable();
+            roomProps["GameModeIndex"] = selectedModeIndex;
+            roomProps["GameModeName"] = gameModes[selectedModeIndex].modeName;
+            roomProps["GameModeScene"] = selectedSceneName;
+            PhotonNetwork.CurrentRoom.SetCustomProperties(roomProps);
+            LogState($"✅ [STORE] Game mode stored in room properties: {gameModes[selectedModeIndex].modeName} (Scene: {selectedSceneName})");
+        }
+        else if (PhotonNetwork.InRoom && !PhotonNetwork.IsMasterClient)
+        {
+            LogState("⚠️ [WARN] Not master client - cannot set room properties");
         }
         
         // Hide game mode selection panel

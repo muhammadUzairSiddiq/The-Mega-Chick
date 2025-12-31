@@ -211,15 +211,74 @@ public class Step6_UI_Setup : EditorWindow
         GameObject scrollView = CreateScrollView("RoomListScrollView", roomListPanel.transform, new Vector2(0, 0), new Vector2(580, 380));
         Transform contentParent = scrollView.transform.Find("Viewport/Content");
         
-        // Create Room Entry Prefab (simple button) - save as prefab first
-        GameObject roomEntryTemplate = CreateButton("RoomEntryTemplate", contentParent, "Room Name (0/8)", Vector2.zero, new Vector2(560, 50));
-        SetButtonColor(roomEntryTemplate.GetComponent<Button>(), new Color(0.3f, 0.3f, 0.5f));
+        // Create Room Entry Prefab with proper structure (similar to PlayerEntry)
+        // Structure: Horizontal layout with Room Name, Host, Game Mode, Player Count, Join Button
+        GameObject roomEntryTemplate = CreatePanel("RoomEntryTemplate", contentParent, Vector2.zero, new Vector2(560, 60));
+        Image panelImage = roomEntryTemplate.GetComponent<Image>();
+        if (panelImage != null)
+        {
+            panelImage.color = new Color(0.7f, 0.6f, 0.8f, 1f); // Light purple
+        }
+        
+        // Add Horizontal Layout Group
+        HorizontalLayoutGroup layoutGroup = roomEntryTemplate.AddComponent<HorizontalLayoutGroup>();
+        layoutGroup.spacing = 10f;
+        layoutGroup.padding = new RectOffset(10, 10, 5, 5);
+        layoutGroup.childAlignment = TextAnchor.MiddleLeft;
+        layoutGroup.childControlWidth = false;
+        layoutGroup.childControlHeight = false;
+        layoutGroup.childForceExpandWidth = false;
+        layoutGroup.childForceExpandHeight = false;
+        
+        // Room Name Text (left, flexible width)
+        GameObject roomNameText = CreateText("RoomNameText", roomEntryTemplate.transform, "Epic Race Arena", Vector2.zero, 18);
+        roomNameText.GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
+        RectTransform roomNameRect = roomNameText.GetComponent<RectTransform>();
+        roomNameRect.sizeDelta = new Vector2(150, 50);
+        roomNameRect.anchorMin = new Vector2(0, 0.5f);
+        roomNameRect.anchorMax = new Vector2(0, 0.5f);
+        roomNameRect.pivot = new Vector2(0, 0.5f);
+        
+        // Host Text (left-center)
+        GameObject hostText = CreateText("HostText", roomEntryTemplate.transform, "Host: BeanMaster", Vector2.zero, 16);
+        RectTransform hostRect = hostText.GetComponent<RectTransform>();
+        hostRect.sizeDelta = new Vector2(120, 50);
+        hostRect.anchorMin = new Vector2(0, 0.5f);
+        hostRect.anchorMax = new Vector2(0, 0.5f);
+        hostRect.pivot = new Vector2(0, 0.5f);
+        
+        // Game Mode Text (center)
+        GameObject gameModeText = CreateText("GameModeText", roomEntryTemplate.transform, "Race", Vector2.zero, 18);
+        gameModeText.GetComponent<TextMeshProUGUI>().fontStyle = FontStyles.Bold;
+        RectTransform gameModeRect = gameModeText.GetComponent<RectTransform>();
+        gameModeRect.sizeDelta = new Vector2(80, 50);
+        gameModeRect.anchorMin = new Vector2(0, 0.5f);
+        gameModeRect.anchorMax = new Vector2(0, 0.5f);
+        gameModeRect.pivot = new Vector2(0, 0.5f);
+        
+        // Player Count Text (right-center)
+        GameObject playerCountText = CreateText("PlayerCountText", roomEntryTemplate.transform, "3/12", Vector2.zero, 18);
+        RectTransform playerCountRect = playerCountText.GetComponent<RectTransform>();
+        playerCountRect.sizeDelta = new Vector2(80, 50);
+        playerCountRect.anchorMin = new Vector2(0, 0.5f);
+        playerCountRect.anchorMax = new Vector2(0, 0.5f);
+        playerCountRect.pivot = new Vector2(0, 0.5f);
+        
+        // Join Button (right side) - shows game mode name
+        GameObject joinButton = CreateButton("JoinButton", roomEntryTemplate.transform, "Race", Vector2.zero, new Vector2(100, 50));
+        SetButtonColor(joinButton.GetComponent<Button>(), new Color(0.5f, 0.2f, 0.8f)); // Purple
+        RectTransform joinButtonRect = joinButton.GetComponent<RectTransform>();
+        joinButtonRect.anchorMin = new Vector2(0, 0.5f);
+        joinButtonRect.anchorMax = new Vector2(0, 0.5f);
+        joinButtonRect.pivot = new Vector2(0, 0.5f);
         
         // Save room entry as prefab
         string prefabPath = "Assets/Prefabs/UI/RoomEntryPrefab.prefab";
         EnsureDirectoryExists(Path.GetDirectoryName(prefabPath));
         GameObject roomEntryPrefab = PrefabUtility.SaveAsPrefabAsset(roomEntryTemplate, prefabPath);
         Object.DestroyImmediate(roomEntryTemplate); // Remove template from scene
+        
+        Debug.Log($"✅ Created RoomEntryPrefab at {prefabPath}");
         
         // Add RoomCreationUI script
         RoomCreationUI roomCreationUI = panel.AddComponent<RoomCreationUI>();
@@ -249,11 +308,37 @@ public class Step6_UI_Setup : EditorWindow
         Debug.Log("🔨 Creating RoomListUI (NEW - Separate room list panel)...");
         
         GameObject panel = CreatePanel("RoomListPanel", parent, new Vector2(600, 0), new Vector2(400, 600));
-        panel.SetActive(false); // Hidden by default, shown when needed
+        panel.SetActive(true); // Active by default to show room list
         
         // Room List Parent (ScrollView)
         GameObject scrollView = CreateScrollView("RoomListScrollView", panel.transform, new Vector2(0, 0), new Vector2(380, 550));
         Transform contentParent = scrollView.transform.Find("Viewport/Content");
+        
+        // Add Vertical Layout Group to Content for proper spacing
+        if (contentParent != null)
+        {
+            VerticalLayoutGroup layoutGroup = contentParent.gameObject.GetComponent<VerticalLayoutGroup>();
+            if (layoutGroup == null)
+            {
+                layoutGroup = contentParent.gameObject.AddComponent<VerticalLayoutGroup>();
+            }
+            layoutGroup.spacing = 10f;
+            layoutGroup.padding = new RectOffset(10, 10, 10, 10);
+            layoutGroup.childControlWidth = true;
+            layoutGroup.childControlHeight = false;
+            layoutGroup.childForceExpandWidth = true;
+            layoutGroup.childForceExpandHeight = false;
+            
+            // Add Content Size Fitter to auto-size content
+            ContentSizeFitter sizeFitter = contentParent.gameObject.GetComponent<ContentSizeFitter>();
+            if (sizeFitter == null)
+            {
+                sizeFitter = contentParent.gameObject.AddComponent<ContentSizeFitter>();
+            }
+            sizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            
+            Debug.Log("✅ Added VerticalLayoutGroup and ContentSizeFitter to Content");
+        }
         
         // Add RoomListUI script
         RoomListUI roomListUI = panel.AddComponent<RoomListUI>();
@@ -264,21 +349,19 @@ public class Step6_UI_Setup : EditorWindow
         
         roomListParentField?.SetValue(roomListUI, contentParent);
         
-        // Try to load room entry prefab (use same as RoomCreationUI or create new)
-        GameObject roomEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{UI_PREFABS_PATH}/RoomEntry.prefab");
+        // Try to load room entry prefab (must be RoomEntryPrefab created above)
+        GameObject roomEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/RoomEntryPrefab.prefab");
         if (roomEntryPrefab == null)
         {
-            // Fallback: try to use PlayerEntry prefab as template
-            roomEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{UI_PREFABS_PATH}/PlayerEntry.prefab");
-            if (roomEntryPrefab != null)
-            {
-                Debug.Log($"⚠️ RoomEntry.prefab not found, using PlayerEntry.prefab as fallback");
-            }
+            // Try alternative path
+            roomEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{UI_PREFABS_PATH}/RoomEntryPrefab.prefab");
         }
         
         if (roomEntryPrefab == null)
         {
-            Debug.LogWarning($"⚠️ Could not find RoomEntry.prefab or PlayerEntry.prefab at {UI_PREFABS_PATH}! Room list will not display entries.");
+            Debug.LogError($"❌ Could not find RoomEntryPrefab.prefab! Room list will not display entries.");
+            Debug.LogError($"💡 The prefab should have been created in CreateRoomCreationUI().");
+            Debug.LogError($"💡 Please run 'Step 6 UI Setup → Complete Setup' again to create the prefab.");
         }
         else
         {

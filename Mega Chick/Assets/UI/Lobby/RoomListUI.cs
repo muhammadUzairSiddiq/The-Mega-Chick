@@ -26,19 +26,75 @@ public class RoomListUI : MonoBehaviour
     {
         // Subscribe in Awake so it works even if GameObject is inactive
         SubscribeToRoomListUpdates();
-    }
-    
-    private void OnEnable()
-    {
-        // Re-subscribe when enabled (in case it was disabled)
-        SubscribeToRoomListUpdates();
-        // Refresh when shown
-        RefreshRoomList();
+        
+        // Subscribe to lobby join event
+        GameEventBus.OnJoinedLobby += OnJoinedLobby;
+        
+        // Subscribe to room join event - refresh when room is created/joined
+        GameEventBus.OnJoinedRoom += OnJoinedRoom;
     }
     
     private void OnDestroy()
     {
         UnsubscribeFromRoomListUpdates();
+        GameEventBus.OnJoinedLobby -= OnJoinedLobby;
+        GameEventBus.OnJoinedRoom -= OnJoinedRoom;
+    }
+    
+    /// <summary>
+    /// Called when joined lobby - refresh room list.
+    /// </summary>
+    private void OnJoinedLobby()
+    {
+        Log("🎉 [EVENT] OnJoinedLobby - refreshing room list...");
+        RefreshRoomList();
+    }
+    
+    /// <summary>
+    /// Called when joined room - refresh room list to show the room.
+    /// </summary>
+    private void OnJoinedRoom()
+    {
+        Log("🎉 [EVENT] OnJoinedRoom - refreshing room list to show current room...");
+        // Small delay to ensure room properties are set
+        StartCoroutine(DelayedRefreshAfterJoin());
+    }
+    
+    private System.Collections.IEnumerator DelayedRefreshAfterJoin()
+    {
+        yield return new WaitForSeconds(0.3f); // Wait for room properties to be set
+        RefreshRoomList();
+    }
+    
+    private void Start()
+    {
+        Log("🔵 [START] RoomListUI Start() called");
+        // Auto-refresh on start if active
+        if (gameObject.activeInHierarchy)
+        {
+            Log("✅ [START] Panel is active, refreshing room list...");
+            StartCoroutine(DelayedRefresh());
+        }
+        else
+        {
+            Log("⚠️ [START] Panel is inactive, will refresh when enabled");
+        }
+    }
+    
+    private void OnEnable()
+    {
+        Log("🔵 [ENABLE] RoomListUI OnEnable() called");
+        // Re-subscribe when enabled (in case it was disabled)
+        SubscribeToRoomListUpdates();
+        // Refresh when shown - with a small delay to ensure everything is ready
+        StartCoroutine(DelayedRefresh());
+    }
+    
+    private System.Collections.IEnumerator DelayedRefresh()
+    {
+        yield return new WaitForSeconds(0.2f); // Small delay to ensure Photon is ready
+        Log("⏰ [DELAY] Delayed refresh triggered");
+        RefreshRoomList();
     }
     
     private void OnDisable()
@@ -89,9 +145,41 @@ public class RoomListUI : MonoBehaviour
     public void RefreshRoomList()
     {
         Log($"🔄 [REFRESH] Refreshing room list... InLobby: {PhotonNetwork.InLobby}, InRoom: {PhotonNetwork.InRoom}");
+        Log($"🔍 [DEBUG] roomListParent: {(roomListParent != null ? roomListParent.name : "NULL")}");
+        Log($"🔍 [DEBUG] roomEntryPrefab: {(roomEntryPrefab != null ? roomEntryPrefab.name : "NULL")}");
         
-        // Allow refresh even if not in lobby (we'll show current room if in one)
-        // But prefer to be in lobby to see other rooms
+        // Check if prefab is assigned
+        if (roomEntryPrefab == null)
+        {
+            Log("❌ [ERROR] roomEntryPrefab is NULL! Cannot create room entries.");
+            Log("💡 [TIP] Make sure RoomEntryPrefab.prefab exists in Assets/Prefabs/UI/");
+            return;
+        }
+        
+        // Check if parent is assigned
+        if (roomListParent == null)
+        {
+            Log("❌ [ERROR] roomListParent is NULL! Cannot create room entries.");
+            return;
+        }
+        
+        // Ensure we're in lobby to see rooms (Photon requirement)
+        if (!PhotonNetwork.InLobby && !PhotonNetwork.InRoom)
+        {
+            Log("⚠️ [WARN] Not in lobby and not in room! Joining lobby...");
+            if (PhotonNetwork.IsConnectedAndReady)
+            {
+                PhotonNetwork.JoinLobby();
+                // Wait for lobby join, then refresh
+                StartCoroutine(WaitForLobbyAndRefresh());
+                return;
+            }
+            else
+            {
+                Log("❌ [ERROR] Not connected! Cannot join lobby.");
+                return;
+            }
+        }
         
         // Ensure we're subscribed
         SubscribeToRoomListUpdates();
@@ -115,35 +203,66 @@ public class RoomListUI : MonoBehaviour
         }
     }
     
+    private System.Collections.IEnumerator WaitForLobbyAndRefresh()
+    {
+        // Wait up to 2 seconds for lobby join
+        float timeout = 2f;
+        float elapsed = 0f;
+        
+        while (!PhotonNetwork.InLobby && elapsed < timeout)
+        {
+            yield return new WaitForSeconds(0.1f);
+            elapsed += 0.1f;
+        }
+        
+        if (PhotonNetwork.InLobby)
+        {
+            Log("✅ Joined lobby, refreshing room list...");
+            RefreshRoomList();
+        }
+        else
+        {
+            Log("❌ Failed to join lobby within timeout");
+        }
+    }
+    
     /// <summary>
     /// Called when room list is updated.
     /// </summary>
     private void OnRoomListUpdated(List<RoomInfo> roomList)
     {
         Log($"🎉 [EVENT] OnRoomListUpdated called with {roomList?.Count ?? 0} rooms");
+        Log($"🔍 [DEBUG] Panel active: {gameObject.activeInHierarchy}");
+        Log($"🔍 [DEBUG] Panel enabled: {enabled}");
         
         ClearRoomList();
         
         if (roomListParent == null)
         {
             Log("❌ [ERROR] roomListParent is NULL!");
+            Log("💡 [TIP] Make sure Content GameObject exists under Viewport in RoomListScrollView");
             return;
         }
         
         if (roomEntryPrefab == null)
         {
             Log("❌ [ERROR] roomEntryPrefab is NULL! Cannot create room entries.");
+            Log("💡 [TIP] Assign RoomEntryPrefab in the Inspector or run 'Step 6 UI Setup → Complete Setup'");
             return;
         }
+        
+        Log($"✅ [CHECK] All references valid - roomListParent: {roomListParent.name}, prefab: {roomEntryPrefab.name}");
         
         // Get current room info (if in a room) - we want to show it even if Photon filters it out
         string currentRoomCode = "";
         bool isInRoom = false;
+        Room currentRoom = null;
         if (PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null && RoomManager.Instance != null)
         {
+            currentRoom = PhotonNetwork.CurrentRoom;
             currentRoomCode = RoomManager.Instance.GetCurrentRoomCode();
             isInRoom = true;
-            Log($"🏠 [CURRENT] Found current room: {currentRoomCode}");
+            Log($"🏠 [CURRENT] Found current room: {currentRoomCode} (Players: {currentRoom.PlayerCount}/{currentRoom.MaxPlayers})");
         }
         
         // Combine room list with current room (if not already in list)
@@ -151,6 +270,7 @@ public class RoomListUI : MonoBehaviour
         if (roomList != null)
         {
             allRooms.AddRange(roomList);
+            Log($"📋 [LIST] Photon room list has {roomList.Count} rooms");
         }
         
         // Check if current room is already in the list
@@ -162,14 +282,21 @@ public class RoomListUI : MonoBehaviour
                 if (room != null && room.Name == currentRoomCode)
                 {
                     currentRoomInList = true;
-                    Log($"✅ Current room already in list: {currentRoomCode}");
+                    Log($"✅ Current room already in Photon list: {currentRoomCode}");
                     break;
                 }
+            }
+            
+            if (!currentRoomInList)
+            {
+                Log($"⚠️ [NOTE] Current room {currentRoomCode} is NOT in Photon room list (this is normal - Photon excludes rooms you're in)");
             }
         }
         
         // Create room entry for each room in the list
         int createdCount = 0;
+        Log($"📝 [CREATE] Attempting to create entries for {allRooms.Count} rooms...");
+        
         foreach (RoomInfo room in allRooms)
         {
             if (room == null || room.RemovedFromList) 
@@ -180,42 +307,87 @@ public class RoomListUI : MonoBehaviour
             
             try
             {
+                Log($"🔨 [CREATE] Creating entry for room: {room.Name} (Players: {room.PlayerCount}/{room.MaxPlayers})");
                 GameObject entry = Instantiate(roomEntryPrefab, roomListParent);
+                if (entry == null)
+                {
+                    Log($"❌ [ERROR] Instantiate returned NULL for room: {room.Name}");
+                    continue;
+                }
+                
                 roomEntries.Add(entry);
+                Log($"✅ [CREATE] Instantiated GameObject: {entry.name}");
+                
                 SetupRoomEntry(entry, room, currentRoomCode);
                 createdCount++;
-                Log($"✅ Created entry for room: {room.Name}");
+                Log($"✅ [CREATE] Successfully created entry for room: {room.Name}");
             }
             catch (System.Exception e)
             {
                 Log($"❌ [ERROR] Failed to create room entry: {e.Message}");
+                Log($"❌ [ERROR] Stack trace: {e.StackTrace}");
             }
         }
         
-        // If we're in a room but it's not in the Photon room list, create a manual entry for it
-        if (isInRoom && !currentRoomInList && PhotonNetwork.CurrentRoom != null)
+        Log($"📊 [SUMMARY] Created {createdCount} room entries out of {allRooms.Count} rooms");
+        
+        // ALWAYS show current room if we're in one (Photon excludes it from room list)
+        if (isInRoom && currentRoom != null)
         {
+            // Always add current room to the list, even if it's in Photon's list
+            // This ensures the room creator sees their own room
             try
             {
+                Log($"🔨 [CREATE] Creating entry for current room: {currentRoomCode}");
                 GameObject entry = Instantiate(roomEntryPrefab, roomListParent);
-                roomEntries.Add(entry);
-                SetupRoomEntryFromCurrentRoom(entry, PhotonNetwork.CurrentRoom, currentRoomCode);
-                createdCount++;
-                Log($"✅ Created entry for current room (not in Photon list): {currentRoomCode}");
+                if (entry == null)
+                {
+                    Log($"❌ [ERROR] Instantiate returned NULL for current room");
+                }
+                else
+                {
+                    roomEntries.Add(entry);
+                    SetupRoomEntryFromCurrentRoom(entry, currentRoom, currentRoomCode);
+                    createdCount++;
+                    Log($"✅ [CREATE] Created entry for current room: {currentRoomCode}");
+                }
             }
             catch (System.Exception e)
             {
                 Log($"❌ [ERROR] Failed to create entry for current room: {e.Message}");
+                Log($"❌ [ERROR] Stack trace: {e.StackTrace}");
             }
         }
         
         if (createdCount == 0)
         {
-            Log("⚠️ No room entries created (room list empty and not in a room)");
+            Log("⚠️ [WARN] No room entries created!");
+            Log($"💡 [TIP] Reasons could be:");
+            Log($"   - No rooms available (create a room or wait for others)");
+            Log($"   - Not in lobby (Photon requirement to see rooms)");
+            Log($"   - All rooms were filtered out (removed/full/closed)");
+            Log($"   - Prefab instantiation failed (check console for errors)");
+            
+            // Only show test entry if truly no rooms AND not in a room
+            if (allRooms.Count == 0 && !isInRoom)
+            {
+                Log("💡 [TIP] Try creating a room to see it in the list!");
+            }
         }
         else
         {
-            Log($"✅ Created {createdCount} room entries (total: {roomEntries.Count})");
+            Log($"✅ [SUCCESS] Created {createdCount} room entries (total: {roomEntries.Count})");
+        }
+        
+        // Force layout update
+        if (roomListParent != null)
+        {
+            UnityEngine.UI.LayoutGroup layout = roomListParent.GetComponent<UnityEngine.UI.LayoutGroup>();
+            if (layout != null)
+            {
+                UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(roomListParent as RectTransform);
+                Log("✅ [LAYOUT] Forced layout rebuild");
+            }
         }
     }
     
@@ -229,23 +401,80 @@ public class RoomListUI : MonoBehaviour
         
         // Get room info
         string roomName = room.Name;
-        string roomNo = room.Name;
+        string friendlyRoomName = roomName;
+        if (RoomManager.Instance != null)
+        {
+            friendlyRoomName = RoomManager.Instance.GetCurrentRoomName();
+        }
+        
+        // Get host name (master client)
+        string hostName = "Unknown";
+        if (room.CustomProperties.ContainsKey("HostName"))
+        {
+            hostName = room.CustomProperties["HostName"].ToString();
+        }
+        else if (PhotonNetwork.MasterClient != null)
+        {
+            hostName = PhotonNetwork.MasterClient.NickName;
+            if (string.IsNullOrEmpty(hostName))
+            {
+                hostName = $"Player {PhotonNetwork.MasterClient.ActorNumber}";
+            }
+        }
+        
+        // Get game mode from room properties
+        string gameModeName = "Unknown";
+        if (room.CustomProperties.ContainsKey("GameModeName"))
+        {
+            gameModeName = room.CustomProperties["GameModeName"].ToString();
+        }
+        else if (room.CustomProperties.ContainsKey("GameModeIndex"))
+        {
+            int modeIndex = (int)room.CustomProperties["GameModeIndex"];
+            string[] modeNames = { "Race", "FFA", "Hunter", "Zone", "Carry" };
+            if (modeIndex >= 0 && modeIndex < modeNames.Length)
+            {
+                gameModeName = modeNames[modeIndex];
+            }
+        }
+        
         int playerCount = room.PlayerCount;
         int maxPlayers = room.MaxPlayers;
         
-        // Format: Room No | Room Name | Players (1/2) | Join Button
+        // Format: Room Name | Host: HostName | Game Mode | Players (1/2)
         if (allTexts.Length > 0)
         {
-            string formattedText = $"{roomNo} | {roomName} | Players {playerCount}/{maxPlayers}";
-            allTexts[0].text = formattedText;
+            allTexts[0].text = friendlyRoomName;
+        }
+        if (allTexts.Length > 1)
+        {
+            allTexts[1].text = $"Host: {hostName}";
+        }
+        if (allTexts.Length > 2)
+        {
+            allTexts[2].text = gameModeName;
+        }
+        if (allTexts.Length > 3)
+        {
+            allTexts[3].text = $"Players {playerCount}/{maxPlayers}";
+        }
+        else if (allTexts.Length > 0)
+        {
+            allTexts[0].text = $"{friendlyRoomName} | Host: {hostName} | {gameModeName} | {playerCount}/{maxPlayers}";
         }
         
         // Join button - disabled for current room (you're already in it)
-        bool isRoomOwner = (currentRoomCode == room.Name);
         if (allButtons.Length > 0)
         {
             Button joinButton = allButtons[0];
             joinButton.interactable = false; // Always disabled for current room
+            
+            // Set button text to game mode name
+            TextMeshProUGUI buttonText = joinButton.GetComponentInChildren<TextMeshProUGUI>();
+            if (buttonText != null)
+            {
+                buttonText.text = gameModeName;
+            }
             
             // Change button color
             Image buttonImage = joinButton.GetComponent<Image>();
@@ -260,24 +489,93 @@ public class RoomListUI : MonoBehaviour
     }
     
     /// <summary>
-    /// Setup room entry UI: Room No | Room Name | Players (1/2) | Join Button
+    /// Setup room entry UI: Room Name | Host | Game Mode | Players (1/2) | Join Button
     /// </summary>
     private void SetupRoomEntry(GameObject entryObj, RoomInfo room, string currentRoomCode)
     {
         TextMeshProUGUI[] allTexts = entryObj.GetComponentsInChildren<TextMeshProUGUI>();
         Button[] allButtons = entryObj.GetComponentsInChildren<Button>();
         
-        // Get room name (try to get from RoomManager if available)
+        // Get room info
         string roomName = room.Name;
-        string roomNo = room.Name; // Room code is the room name in Photon
+        string friendlyRoomName = roomName; // Default to room code
         
-        // Try to get friendly room name if available
-        // Note: We can't get friendly name from RoomInfo, so we'll use room code
-        // Format: Room No | Room Name | Players (1/2) | Join Button
-        if (allTexts.Length > 0)
+        // Try to get friendly room name from RoomManager
+        if (RoomManager.Instance != null)
         {
-            string formattedText = $"{roomNo} | {roomName} | Players {room.PlayerCount}/{room.MaxPlayers}";
-            allTexts[0].text = formattedText;
+            // Check if this is the current room
+            if (PhotonNetwork.InRoom && PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.Name == roomName)
+            {
+                friendlyRoomName = RoomManager.Instance.GetCurrentRoomName();
+            }
+        }
+        
+        // Get host name (master client)
+        string hostName = "Unknown";
+        if (room.CustomProperties.ContainsKey("HostName"))
+        {
+            hostName = room.CustomProperties["HostName"].ToString();
+        }
+        else if (room.masterClientId > 0)
+        {
+            // Try to get from player list if available
+            hostName = $"Player {room.masterClientId}";
+        }
+        
+        // Get game mode from room properties
+        string gameModeName = "Unknown";
+        if (room.CustomProperties.ContainsKey("GameModeName"))
+        {
+            gameModeName = room.CustomProperties["GameModeName"].ToString();
+        }
+        else if (room.CustomProperties.ContainsKey("GameModeIndex"))
+        {
+            // Fallback: convert index to name
+            int modeIndex = (int)room.CustomProperties["GameModeIndex"];
+            string[] modeNames = { "Race", "FFA", "Hunter", "Zone", "Carry" };
+            if (modeIndex >= 0 && modeIndex < modeNames.Length)
+            {
+                gameModeName = modeNames[modeIndex];
+            }
+        }
+        
+        // Format: Room Name | Host: HostName | Game Mode | Players (1/2)
+        // Try to find text elements by name first, then by index
+        TextMeshProUGUI roomNameText = null;
+        TextMeshProUGUI hostText = null;
+        TextMeshProUGUI gameModeText = null;
+        TextMeshProUGUI playerCountText = null;
+        
+        // Find by name
+        foreach (TextMeshProUGUI text in allTexts)
+        {
+            string name = text.name.ToLower();
+            if (name.Contains("roomname"))
+                roomNameText = text;
+            else if (name.Contains("host"))
+                hostText = text;
+            else if (name.Contains("gamemode") || name.Contains("mode"))
+                gameModeText = text;
+            else if (name.Contains("playercount") || name.Contains("player"))
+                playerCountText = text;
+        }
+        
+        // Fallback to index if not found by name
+        if (roomNameText == null && allTexts.Length > 0) roomNameText = allTexts[0];
+        if (hostText == null && allTexts.Length > 1) hostText = allTexts[1];
+        if (gameModeText == null && allTexts.Length > 2) gameModeText = allTexts[2];
+        if (playerCountText == null && allTexts.Length > 3) playerCountText = allTexts[3];
+        
+        // Set text values
+        if (roomNameText != null) roomNameText.text = friendlyRoomName;
+        if (hostText != null) hostText.text = $"Host: {hostName}";
+        if (gameModeText != null) gameModeText.text = gameModeName;
+        if (playerCountText != null) playerCountText.text = $"{room.PlayerCount}/{room.MaxPlayers}";
+        
+        // Fallback: if no texts found, combine in first text (like PlayerListUI)
+        if (allTexts.Length > 0 && roomNameText == null && hostText == null && gameModeText == null && playerCountText == null)
+        {
+            allTexts[0].text = $"{friendlyRoomName} | Host: {hostName} | {gameModeName} | {room.PlayerCount}/{room.MaxPlayers}";
         }
         
         // Join button - only interactable if not the room owner
@@ -286,6 +584,13 @@ public class RoomListUI : MonoBehaviour
         {
             Button joinButton = allButtons[0];
             joinButton.interactable = !isRoomOwner;
+            
+            // Set button text to game mode name
+            TextMeshProUGUI buttonText = joinButton.GetComponentInChildren<TextMeshProUGUI>();
+            if (buttonText != null)
+            {
+                buttonText.text = gameModeName;
+            }
             
             // Change button color based on state
             Image buttonImage = joinButton.GetComponent<Image>();
@@ -297,7 +602,7 @@ public class RoomListUI : MonoBehaviour
                 }
                 else
                 {
-                    buttonImage.color = Color.green;
+                    buttonImage.color = new Color(0.5f, 0.2f, 0.8f); // Purple like in screenshot
                 }
             }
             

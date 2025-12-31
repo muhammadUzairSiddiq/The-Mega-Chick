@@ -162,12 +162,33 @@ public class LobbyManager : MonoBehaviour
     {
         LogState("🎉 [EVENT] OnJoinedRoom fired!");
         
+        bool isMaster = PhotonNetwork.IsMasterClient;
+        bool isJoiningExistingRoom = false;
+        
+        // Check if room already has a game mode (means we're joining, not creating)
+        if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("GameModeName"))
+        {
+            isJoiningExistingRoom = true;
+            string existingGameMode = PhotonNetwork.CurrentRoom.CustomProperties["GameModeName"].ToString();
+            LogState($"🏠 [ROOM] Joining existing room with game mode: {existingGameMode}");
+            
+            // Store the game mode scene for later use
+            if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("GameModeScene"))
+            {
+                selectedSceneName = PhotonNetwork.CurrentRoom.CustomProperties["GameModeScene"].ToString();
+                LogState($"✅ [STORE] Stored game mode scene from room: {selectedSceneName}");
+            }
+        }
+        else
+        {
+            LogState("🏠 [ROOM] Creating new room (no game mode set yet)");
+        }
+        
         if (RoomManager.Instance != null)
         {
             string roomCode = RoomManager.Instance.GetCurrentRoomCode();
             int playerCount = RoomManager.Instance.GetPlayerCount();
             int maxPlayers = RoomManager.Instance.GetMaxPlayers();
-            bool isMaster = RoomManager.Instance.IsMasterClient();
             
             LogState($"🏠 [ROOM] Room Code: {roomCode}");
             LogState($"👥 [ROOM] Players: {playerCount}/{maxPlayers}");
@@ -252,11 +273,18 @@ public class LobbyManager : MonoBehaviour
             }
         }
         
-        // Hide game mode selection (show after character selection)
+        // Hide game mode selection (only show if master client creating new room)
         if (gameModeSelectionUI != null)
         {
             gameModeSelectionUI.SetActive(false);
-            LogState("✅ [UI] GameModeSelectionUI deactivated (will show after character selection)");
+            if (isJoiningExistingRoom)
+            {
+                LogState("✅ [UI] GameModeSelectionUI deactivated (joining existing room - skip game mode selection)");
+            }
+            else
+            {
+                LogState("✅ [UI] GameModeSelectionUI deactivated (will show after character selection)");
+            }
         }
         
         // Hide ready panel initially
@@ -436,11 +464,59 @@ public class LobbyManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Called when character selection is confirmed - show game mode selection.
+    /// Called when character selection is confirmed - show game mode selection (only if master client creating room).
     /// </summary>
     public void OnCharacterSelectionConfirmed()
     {
         LogState("🎉 [EVENT] Character selection confirmed!");
+        
+        // Check if room already has a game mode (means we're joining, not creating)
+        bool isJoiningExistingRoom = false;
+        if (PhotonNetwork.CurrentRoom != null && PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("GameModeName"))
+        {
+            isJoiningExistingRoom = true;
+            string existingGameMode = PhotonNetwork.CurrentRoom.CustomProperties["GameModeName"].ToString();
+            LogState($"🏠 [ROOM] Room already has game mode: {existingGameMode} - skipping game mode selection");
+            
+            // Get the game mode scene
+            if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("GameModeScene"))
+            {
+                selectedSceneName = PhotonNetwork.CurrentRoom.CustomProperties["GameModeScene"].ToString();
+                LogState($"✅ [STORE] Stored game mode scene from room: {selectedSceneName}");
+            }
+            
+            // Skip game mode selection - go directly to ready panel
+            if (readyPanel != null)
+            {
+                readyPanel.SetActive(true);
+                LogState("✅ [UI] ReadyPanel activated (skipped game mode selection)");
+            }
+            
+            // Hide character selection
+            if (characterSelectionUI != null)
+            {
+                characterSelectionUI.gameObject.SetActive(false);
+                LogState("✅ [UI] CharacterSelectionUI deactivated");
+            }
+            
+            return; // Don't show game mode selection
+        }
+        
+        // Only master client creating a new room should see game mode selection
+        if (!PhotonNetwork.IsMasterClient)
+        {
+            LogState("⚠️ [WARN] Not master client - should not see game mode selection");
+            // Still hide character selection and show ready panel
+            if (characterSelectionUI != null)
+            {
+                characterSelectionUI.gameObject.SetActive(false);
+            }
+            if (readyPanel != null)
+            {
+                readyPanel.SetActive(true);
+            }
+            return;
+        }
         
         // Hide character selection
         if (characterSelectionUI != null)
@@ -488,7 +564,7 @@ public class LobbyManager : MonoBehaviour
             }
         }
         
-        // Show game mode selection
+        // Show game mode selection (only for master client creating new room)
         if (gameModeSelectionUI != null)
         {
             gameModeSelectionUI.SetActive(true);

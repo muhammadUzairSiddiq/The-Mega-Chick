@@ -185,6 +185,15 @@ public class RoomManager : MonoBehaviourPunCallbacks
         // NOTE: OnCreatedRoom fires BEFORE OnJoinedRoom
         // The creator is automatically in the room, OnJoinedRoom will fire next
         LogState("⏳ [WAIT] Waiting for OnJoinedRoom callback (creator auto-joins)...");
+        
+        // Trigger room list update so the created room appears in the list
+        // Note: Photon's OnRoomListUpdate won't include the room we're currently in,
+        // so we'll add it manually in RoomListUI
+        if (cachedRoomList != null)
+        {
+            // Room will be added to list in OnJoinedRoom
+            LogState("📋 [ROOM LIST] Room list will be updated after OnJoinedRoom");
+        }
     }
     
     public override void OnCreateRoomFailed(short returnCode, string message)
@@ -218,6 +227,31 @@ public class RoomManager : MonoBehaviourPunCallbacks
         LogState($"👥 [ROOM] Players: {playerCount}/{maxPlayers}");
         LogState($"👑 [ROOM] Is Master Client: {(isMaster ? "YES ✅" : "NO")}");
         LogState($"✅ [ROOM] Successfully joined room!");
+        
+        // Store host name and room name in room properties (master client only)
+        if (isMaster)
+        {
+            ExitGames.Client.Photon.Hashtable roomProps = new ExitGames.Client.Photon.Hashtable();
+            string hostName = PhotonNetwork.LocalPlayer.NickName;
+            if (string.IsNullOrEmpty(hostName))
+            {
+                hostName = $"Player {PhotonNetwork.LocalPlayer.ActorNumber}";
+            }
+            roomProps["HostName"] = hostName;
+            roomProps["RoomName"] = currentRoomName;
+            PhotonNetwork.CurrentRoom.SetCustomProperties(roomProps);
+            LogState($"✅ [STORE] Stored host name in room properties: {hostName}");
+        }
+        
+        // Trigger room list refresh after joining room
+        // This ensures the room appears in the room list UI
+        if (OnRoomListUpdated != null)
+        {
+            // Refresh the room list to include this room
+            List<RoomInfo> updatedList = new List<RoomInfo>(cachedRoomList);
+            OnRoomListUpdated.Invoke(updatedList);
+            LogState("📋 [ROOM LIST] Triggered room list update after joining room");
+        }
         
         GameEventBus.FireJoinedRoom();
     }
