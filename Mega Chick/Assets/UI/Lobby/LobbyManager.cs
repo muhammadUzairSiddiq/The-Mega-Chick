@@ -222,7 +222,11 @@ public class LobbyManager : MonoBehaviour
                 child.gameObject.SetActive(true);
             }
             
-            // Wait a frame then refresh (ensures CharacterSelectionManager is ready)
+            // IMMEDIATELY refresh character list to load icons
+            characterSelectionUI.RefreshCharacterList();
+            LogState("✅ [UI] CharacterSelectionUI refreshed immediately - icons should load");
+            
+            // Wait a frame then refresh again (ensures CharacterSelectionManager is ready)
             StartCoroutine(DelayedCharacterRefresh());
         }
         else
@@ -365,6 +369,52 @@ public class LobbyManager : MonoBehaviour
     public void ForceShowCharacterSelection()
     {
         LogState("🚀 [FORCE] ForceShowCharacterSelection() called");
+        
+        // Hide room creation UI
+        if (roomCreationUI != null)
+        {
+            roomCreationUI.gameObject.SetActive(false);
+            LogState("✅ [UI] RoomCreationUI deactivated");
+        }
+        
+        // Show character selection UI immediately - FORCE IT
+        if (characterSelectionUI != null)
+        {
+            characterSelectionUI.gameObject.SetActive(true);
+            LogState("✅ [UI] CharacterSelectionUI GameObject activated");
+            
+            // Force enable all child objects
+            foreach (Transform child in characterSelectionUI.transform)
+            {
+                child.gameObject.SetActive(true);
+            }
+            
+            // Refresh character list to load icons
+            characterSelectionUI.RefreshCharacterList();
+            LogState("✅ [UI] CharacterSelectionUI refreshed - icons should load");
+            
+            // Wait a frame then refresh again (ensures CharacterSelectionManager is ready)
+            StartCoroutine(DelayedCharacterRefresh());
+        }
+        else
+        {
+            LogState("❌ [ERROR] characterSelectionUI is NULL! Trying to find it...");
+            
+            // Try to find by GameObject name
+            GameObject panelObj = GameObject.Find("CharacterSelectionPanel");
+            if (panelObj != null)
+            {
+                CharacterSelectionUI foundUI = panelObj.GetComponent<CharacterSelectionUI>();
+                if (foundUI != null)
+                {
+                    characterSelectionUI = foundUI;
+                    characterSelectionUI.gameObject.SetActive(true);
+                    characterSelectionUI.RefreshCharacterList();
+                    LogState($"✅ [FIX] Found CharacterSelectionUI and activated!");
+                    StartCoroutine(DelayedCharacterRefresh());
+                }
+            }
+        }
         
         // Hide room creation UI
         if (roomCreationUI != null)

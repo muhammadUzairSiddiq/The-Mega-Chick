@@ -21,6 +21,22 @@ public class Step6_UI_Setup : EditorWindow
     [MenuItem("Mega Chick/Step 6 UI Setup/Complete Setup (Recreate All UI)")]
     public static void CompleteSetup()
     {
+        // WARNING: This will destroy all existing UI!
+        bool confirmed = EditorUtility.DisplayDialog(
+            "⚠️ WARNING: This will destroy all existing UI!",
+            "This will DELETE all existing UI panels, buttons, and graphics you've manually created or improved.\n\n" +
+            "Are you SURE you want to continue?\n\n" +
+            "If you want to preserve your existing UI, use:\n" +
+            "'Wire Only (Preserve Existing UI)' instead.",
+            "Yes, Destroy Everything",
+            "Cancel");
+        
+        if (!confirmed)
+        {
+            Debug.Log("❌ Setup cancelled by user");
+            return;
+        }
+        
         Debug.Log("🚀 Starting Complete UI Setup - Recreating ALL UI...");
         
         // Load or create Lobby scene
@@ -79,6 +95,60 @@ public class Step6_UI_Setup : EditorWindow
             "✅ CharacterSelectionManager (with auto-loaded data)\n" +
             "✅ LobbyManager (all wired)\n\n" +
             "All buttons wired via onClick.AddListener!",
+            "OK");
+    }
+    
+    [MenuItem("Mega Chick/Step 6 UI Setup/Wire Only (Preserve Existing UI)")]
+    public static void WireOnlySetup()
+    {
+        Debug.Log("🔧 Starting Wire Only Setup - Preserving existing UI...");
+        
+        // Load Lobby scene
+        Scene lobbyScene = LoadOrCreateLobbyScene();
+        if (!lobbyScene.IsValid())
+        {
+            Debug.LogError("❌ Failed to load/create Lobby scene!");
+            return;
+        }
+        
+        // Find or create Canvas
+        Canvas canvas = FindOrCreateCanvas();
+        if (canvas == null)
+        {
+            Debug.LogError("❌ Failed to create Canvas!");
+            return;
+        }
+        
+        // Wire existing UI (or create if missing)
+        WireOrCreateRoomCreationUI(canvas.transform);
+        WireOrCreateRoomListUI(canvas.transform);
+        WireOrCreatePlayerListUI(canvas.transform);
+        WireOrCreateCharacterSelectionUI(canvas.transform);
+        WireOrCreateGameModeSelectionUI(canvas.transform);
+        WireOrCreateReadyPanel(canvas.transform);
+        
+        // Create Managers (only if missing)
+        CreateGameModeSelectionManager();
+        CreateCharacterSelectionManager();
+        
+        // Auto-load CharacterData
+        AutoLoadCharacterData();
+        
+        // Wire or create LobbyManager
+        WireOrCreateLobbyManager(canvas.transform);
+        
+        // Save scene
+        EditorSceneManager.SaveScene(lobbyScene);
+        AssetDatabase.SaveAssets();
+        
+        Debug.Log("✅ Wire Only Setup Done! Existing UI preserved and wired.");
+        EditorUtility.DisplayDialog("Wire Only Setup Done",
+            "Existing UI preserved and wired successfully!\n\n" +
+            "✅ All existing UI panels preserved\n" +
+            "✅ All buttons wired via onClick.AddListener\n" +
+            "✅ Missing components created if needed\n" +
+            "✅ Managers created if missing\n\n" +
+            "Your manually improved graphics and buttons are safe!",
             "OK");
     }
     
@@ -435,7 +505,7 @@ public class Step6_UI_Setup : EditorWindow
         // Character Preview Panel
         GameObject previewPanel = CreatePanel("PreviewPanel", panel.transform, new Vector2(0, 0), new Vector2(600, 500));
         
-        // Character Icon
+        // Character Icon - Create both Image (for Sprite) and RawImage (for Texture2D)
         GameObject iconObj = new GameObject("CharacterIcon");
         iconObj.transform.SetParent(previewPanel.transform);
         RectTransform iconRect = iconObj.AddComponent<RectTransform>();
@@ -443,8 +513,16 @@ public class Step6_UI_Setup : EditorWindow
         iconRect.anchorMax = new Vector2(0.5f, 0.5f);
         iconRect.anchoredPosition = new Vector2(0, 150);
         iconRect.sizeDelta = new Vector2(200, 200);
+        
+        // Image component for Sprite icons
         Image iconImage = iconObj.AddComponent<Image>();
-        iconImage.color = new Color(0.5f, 0.5f, 0.5f, 1f);
+        iconImage.color = Color.white; // White color to show sprites properly (not grey!)
+        iconImage.preserveAspect = true; // Preserve sprite aspect ratio
+        
+        // RawImage component for Texture2D icons (initially disabled)
+        UnityEngine.UI.RawImage iconRawImage = iconObj.AddComponent<UnityEngine.UI.RawImage>();
+        iconRawImage.color = Color.white; // White color for textures too
+        iconRawImage.gameObject.SetActive(false);
         
         // Character Name
         GameObject nameText = CreateText("CharacterNameText", previewPanel.transform, "Character Name", new Vector2(0, 50), 32);
@@ -489,6 +567,7 @@ public class Step6_UI_Setup : EditorWindow
         var abilityTextField = typeof(CharacterSelectionUI).GetField("characterAbilityText", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var statsTextField = typeof(CharacterSelectionUI).GetField("characterStatsText", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var iconImageField = typeof(CharacterSelectionUI).GetField("characterIconImage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        var iconRawImageField = typeof(CharacterSelectionUI).GetField("characterIconRawImage", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var previousButtonField = typeof(CharacterSelectionUI).GetField("previousButton", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var nextButtonField = typeof(CharacterSelectionUI).GetField("nextButton", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         var selectButtonField = typeof(CharacterSelectionUI).GetField("selectButton", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
@@ -501,6 +580,7 @@ public class Step6_UI_Setup : EditorWindow
         abilityTextField?.SetValue(characterSelectionUI, abilityText.GetComponent<TextMeshProUGUI>());
         statsTextField?.SetValue(characterSelectionUI, statsText.GetComponent<TextMeshProUGUI>());
         iconImageField?.SetValue(characterSelectionUI, iconImage);
+        iconRawImageField?.SetValue(characterSelectionUI, iconRawImage);
         previousButtonField?.SetValue(characterSelectionUI, previousButton.GetComponent<Button>());
         nextButtonField?.SetValue(characterSelectionUI, nextButton.GetComponent<Button>());
         selectButtonField?.SetValue(characterSelectionUI, selectButton.GetComponent<Button>());
@@ -803,6 +883,43 @@ public class Step6_UI_Setup : EditorWindow
         textComp.alignment = TextAlignmentOptions.Center;
         textComp.color = Color.white;
         
+        // Assign default TextMeshPro font - use static property or find any TMP font
+        if (textComp.font == null)
+        {
+            TMP_FontAsset defaultFont = null;
+            
+            // Try to use TMP_Settings default font (static property)
+            if (TMP_Settings.defaultFontAsset != null)
+            {
+                defaultFont = TMP_Settings.defaultFontAsset;
+            }
+            
+            // Fallback: find any TMP font asset
+            if (defaultFont == null)
+            {
+                string[] fontGuids = AssetDatabase.FindAssets("t:TMP_FontAsset");
+                if (fontGuids.Length > 0)
+                {
+                    string fontPath = AssetDatabase.GUIDToAssetPath(fontGuids[0]);
+                    defaultFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(fontPath);
+                }
+            }
+            
+            if (defaultFont != null)
+            {
+                textComp.font = defaultFont;
+                // Also assign the correct material (not URP Lit!)
+                if (defaultFont.material != null)
+                {
+                    textComp.fontSharedMaterial = defaultFont.material;
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"⚠️ Could not find TextMeshPro font asset for button {name}! Text may appear corrupted. Please import TextMeshPro Essentials or assign a font manually.");
+            }
+        }
+        
         return buttonObj;
     }
     
@@ -831,6 +948,43 @@ public class Step6_UI_Setup : EditorWindow
         textComp.fontSize = fontSize;
         textComp.alignment = TextAlignmentOptions.Center;
         textComp.color = Color.white;
+        
+        // Assign default TextMeshPro font - use static property or find any TMP font
+        if (textComp.font == null)
+        {
+            TMP_FontAsset defaultFont = null;
+            
+            // Try to use TMP_Settings default font (static property)
+            if (TMP_Settings.defaultFontAsset != null)
+            {
+                defaultFont = TMP_Settings.defaultFontAsset;
+            }
+            
+            // Fallback: find any TMP font asset
+            if (defaultFont == null)
+            {
+                string[] fontGuids = AssetDatabase.FindAssets("t:TMP_FontAsset");
+                if (fontGuids.Length > 0)
+                {
+                    string fontPath = AssetDatabase.GUIDToAssetPath(fontGuids[0]);
+                    defaultFont = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(fontPath);
+                }
+            }
+            
+            if (defaultFont != null)
+            {
+                textComp.font = defaultFont;
+                // Also assign the correct material (not URP Lit!)
+                if (defaultFont.material != null)
+                {
+                    textComp.fontSharedMaterial = defaultFont.material;
+                }
+            }
+            else
+            {
+                Debug.LogWarning($"⚠️ Could not find TextMeshPro font asset for {name}! Text may appear corrupted. Please import TextMeshPro Essentials or assign a font manually.");
+            }
+        }
         
         return textObj;
     }
@@ -892,6 +1046,381 @@ public class Step6_UI_Setup : EditorWindow
         {
             Directory.CreateDirectory(path);
         }
+    }
+    
+    // WireOrCreate methods - preserve existing UI, only wire or create if missing
+    private static void WireOrCreateRoomCreationUI(Transform parent)
+    {
+        RoomCreationUI existing = Object.FindObjectOfType<RoomCreationUI>();
+        if (existing != null)
+        {
+            Debug.Log("✅ Found existing RoomCreationUI - wiring references only");
+            // Try to wire missing references
+            WireRoomCreationUI(existing);
+            return;
+        }
+        
+        Debug.Log("🔨 RoomCreationUI not found - creating new one");
+        CreateRoomCreationUI(parent);
+    }
+    
+    private static void WireRoomCreationUI(RoomCreationUI ui)
+    {
+        // Try to find and wire missing references
+        var createRoomButtonField = typeof(RoomCreationUI).GetField("createRoomButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        var refreshButtonField = typeof(RoomCreationUI).GetField("refreshButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        var statusTextField = typeof(RoomCreationUI).GetField("statusText", BindingFlags.NonPublic | BindingFlags.Instance);
+        var roomListPanelField = typeof(RoomCreationUI).GetField("roomListPanel", BindingFlags.NonPublic | BindingFlags.Instance);
+        var roomListParentField = typeof(RoomCreationUI).GetField("roomListParent", BindingFlags.NonPublic | BindingFlags.Instance);
+        var roomEntryPrefabField = typeof(RoomCreationUI).GetField("roomEntryPrefab", BindingFlags.NonPublic | BindingFlags.Instance);
+        
+        // Find buttons and text in children
+        Button createButton = ui.GetComponentInChildren<Button>();
+        if (createButton != null && createButton.name.Contains("CreateRoom"))
+        {
+            createRoomButtonField?.SetValue(ui, createButton);
+        }
+        
+        Button[] allButtons = ui.GetComponentsInChildren<Button>();
+        foreach (Button btn in allButtons)
+        {
+            if (btn.name.Contains("Refresh"))
+            {
+                refreshButtonField?.SetValue(ui, btn);
+            }
+        }
+        
+        TextMeshProUGUI statusText = ui.GetComponentInChildren<TextMeshProUGUI>();
+        if (statusText != null && statusText.name.Contains("Status"))
+        {
+            statusTextField?.SetValue(ui, statusText);
+        }
+        
+        // Find room list panel
+        Transform roomListPanel = ui.transform.Find("RoomListPanel");
+        if (roomListPanel == null)
+        {
+            roomListPanel = ui.transform.Find("RoomListScrollView")?.parent;
+        }
+        if (roomListPanel != null)
+        {
+            roomListPanelField?.SetValue(ui, roomListPanel.gameObject);
+            Transform content = roomListPanel.Find("RoomListScrollView/Viewport/Content");
+            if (content == null)
+            {
+                content = roomListPanel.Find("Viewport/Content");
+            }
+            if (content != null)
+            {
+                roomListParentField?.SetValue(ui, content);
+            }
+        }
+        
+        // Try to load room entry prefab
+        GameObject roomEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/RoomEntryPrefab.prefab");
+        if (roomEntryPrefab != null)
+        {
+            roomEntryPrefabField?.SetValue(ui, roomEntryPrefab);
+        }
+        
+        Debug.Log("✅ RoomCreationUI references wired");
+    }
+    
+    private static void WireOrCreateRoomListUI(Transform parent)
+    {
+        RoomListUI existing = Object.FindObjectOfType<RoomListUI>();
+        if (existing != null)
+        {
+            Debug.Log("✅ Found existing RoomListUI - wiring references only");
+            WireRoomListUI(existing);
+            return;
+        }
+        
+        Debug.Log("🔨 RoomListUI not found - creating new one");
+        CreateRoomListUI(parent);
+    }
+    
+    private static void WireRoomListUI(RoomListUI ui)
+    {
+        var roomListParentField = typeof(RoomListUI).GetField("roomListParent", BindingFlags.NonPublic | BindingFlags.Instance);
+        var roomEntryPrefabField = typeof(RoomListUI).GetField("roomEntryPrefab", BindingFlags.NonPublic | BindingFlags.Instance);
+        
+        // Find scroll view content
+        Transform content = ui.transform.Find("RoomListScrollView/Viewport/Content");
+        if (content == null)
+        {
+            ScrollRect scrollRect = ui.GetComponentInChildren<ScrollRect>();
+            if (scrollRect != null && scrollRect.content != null)
+            {
+                content = scrollRect.content;
+            }
+        }
+        if (content != null)
+        {
+            roomListParentField?.SetValue(ui, content);
+        }
+        
+        // Try to load room entry prefab
+        GameObject roomEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/RoomEntryPrefab.prefab");
+        if (roomEntryPrefab != null)
+        {
+            roomEntryPrefabField?.SetValue(ui, roomEntryPrefab);
+        }
+        
+        Debug.Log("✅ RoomListUI references wired");
+    }
+    
+    private static void WireOrCreatePlayerListUI(Transform parent)
+    {
+        PlayerListUI existing = Object.FindObjectOfType<PlayerListUI>();
+        if (existing != null)
+        {
+            Debug.Log("✅ Found existing PlayerListUI - wiring references only");
+            WirePlayerListUI(existing);
+            return;
+        }
+        
+        Debug.Log("🔨 PlayerListUI not found - creating new one");
+        CreatePlayerListUI(parent);
+    }
+    
+    private static void WirePlayerListUI(PlayerListUI ui)
+    {
+        var playerListParentField = typeof(PlayerListUI).GetField("playerListParent", BindingFlags.NonPublic | BindingFlags.Instance);
+        var playerEntryPrefabField = typeof(PlayerListUI).GetField("playerEntryPrefab", BindingFlags.NonPublic | BindingFlags.Instance);
+        
+        // Find scroll view content
+        Transform content = ui.transform.Find("PlayerListScrollView/Viewport/Content");
+        if (content == null)
+        {
+            ScrollRect scrollRect = ui.GetComponentInChildren<ScrollRect>();
+            if (scrollRect != null && scrollRect.content != null)
+            {
+                content = scrollRect.content;
+            }
+        }
+        if (content != null)
+        {
+            playerListParentField?.SetValue(ui, content);
+        }
+        
+        // Try to load player entry prefab
+        GameObject playerEntryPrefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/PlayerEntry.prefab");
+        if (playerEntryPrefab != null)
+        {
+            playerEntryPrefabField?.SetValue(ui, playerEntryPrefab);
+        }
+        
+        Debug.Log("✅ PlayerListUI references wired");
+    }
+    
+    private static void WireOrCreateCharacterSelectionUI(Transform parent)
+    {
+        CharacterSelectionUI existing = Object.FindObjectOfType<CharacterSelectionUI>();
+        if (existing != null)
+        {
+            Debug.Log("✅ Found existing CharacterSelectionUI - wiring references only");
+            WireCharacterSelectionUI(existing);
+            return;
+        }
+        
+        Debug.Log("🔨 CharacterSelectionUI not found - creating new one");
+        CreateCharacterSelectionUI(parent);
+    }
+    
+    private static void WireCharacterSelectionUI(CharacterSelectionUI ui)
+    {
+        // Find all UI elements by name
+        var nameTextField = typeof(CharacterSelectionUI).GetField("characterNameText", BindingFlags.NonPublic | BindingFlags.Instance);
+        var descTextField = typeof(CharacterSelectionUI).GetField("characterDescriptionText", BindingFlags.NonPublic | BindingFlags.Instance);
+        var abilityTextField = typeof(CharacterSelectionUI).GetField("characterAbilityText", BindingFlags.NonPublic | BindingFlags.Instance);
+        var statsTextField = typeof(CharacterSelectionUI).GetField("characterStatsText", BindingFlags.NonPublic | BindingFlags.Instance);
+        var iconImageField = typeof(CharacterSelectionUI).GetField("characterIconImage", BindingFlags.NonPublic | BindingFlags.Instance);
+        var iconRawImageField = typeof(CharacterSelectionUI).GetField("characterIconRawImage", BindingFlags.NonPublic | BindingFlags.Instance);
+        var previousButtonField = typeof(CharacterSelectionUI).GetField("previousButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        var nextButtonField = typeof(CharacterSelectionUI).GetField("nextButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        var selectButtonField = typeof(CharacterSelectionUI).GetField("selectButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        var confirmButtonField = typeof(CharacterSelectionUI).GetField("confirmButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        var backButtonField = typeof(CharacterSelectionUI).GetField("backButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        var indexTextField = typeof(CharacterSelectionUI).GetField("characterIndexText", BindingFlags.NonPublic | BindingFlags.Instance);
+        
+        // Find by name
+        Transform nameText = ui.transform.Find("PreviewPanel/CharacterNameText");
+        if (nameText == null) nameText = ui.transform.Find("CharacterNameText");
+        if (nameText != null) nameTextField?.SetValue(ui, nameText.GetComponent<TextMeshProUGUI>());
+        
+        Transform descText = ui.transform.Find("PreviewPanel/CharacterDescriptionText");
+        if (descText == null) descText = ui.transform.Find("CharacterDescriptionText");
+        if (descText != null) descTextField?.SetValue(ui, descText.GetComponent<TextMeshProUGUI>());
+        
+        Transform abilityText = ui.transform.Find("PreviewPanel/CharacterAbilityText");
+        if (abilityText == null) abilityText = ui.transform.Find("CharacterAbilityText");
+        if (abilityText != null) abilityTextField?.SetValue(ui, abilityText.GetComponent<TextMeshProUGUI>());
+        
+        Transform statsText = ui.transform.Find("PreviewPanel/CharacterStatsText");
+        if (statsText == null) statsText = ui.transform.Find("CharacterStatsText");
+        if (statsText != null) statsTextField?.SetValue(ui, statsText.GetComponent<TextMeshProUGUI>());
+        
+        Transform indexText = ui.transform.Find("PreviewPanel/CharacterIndexText");
+        if (indexText == null) indexText = ui.transform.Find("CharacterIndexText");
+        if (indexText != null) indexTextField?.SetValue(ui, indexText.GetComponent<TextMeshProUGUI>());
+        
+        // Find icon (both Image and RawImage)
+        Transform iconObj = ui.transform.Find("PreviewPanel/CharacterIcon");
+        if (iconObj == null) iconObj = ui.transform.Find("CharacterIcon");
+        if (iconObj != null)
+        {
+            Image iconImage = iconObj.GetComponent<Image>();
+            if (iconImage != null) iconImageField?.SetValue(ui, iconImage);
+            
+            UnityEngine.UI.RawImage iconRawImage = iconObj.GetComponent<UnityEngine.UI.RawImage>();
+            if (iconRawImage != null) iconRawImageField?.SetValue(ui, iconRawImage);
+        }
+        
+        // Find buttons
+        Button[] allButtons = ui.GetComponentsInChildren<Button>();
+        foreach (Button btn in allButtons)
+        {
+            if (btn.name.Contains("Previous")) previousButtonField?.SetValue(ui, btn);
+            else if (btn.name.Contains("Next")) nextButtonField?.SetValue(ui, btn);
+            else if (btn.name.Contains("Select")) selectButtonField?.SetValue(ui, btn);
+            else if (btn.name.Contains("Confirm")) confirmButtonField?.SetValue(ui, btn);
+            else if (btn.name.Contains("Back")) backButtonField?.SetValue(ui, btn);
+        }
+        
+        Debug.Log("✅ CharacterSelectionUI references wired");
+    }
+    
+    private static void WireOrCreateGameModeSelectionUI(Transform parent)
+    {
+        GameModeSelectionUI existing = Object.FindObjectOfType<GameModeSelectionUI>();
+        if (existing != null)
+        {
+            Debug.Log("✅ Found existing GameModeSelectionUI - wiring references only");
+            WireGameModeSelectionUI(existing);
+            return;
+        }
+        
+        Debug.Log("🔨 GameModeSelectionUI not found - creating new one");
+        CreateGameModeSelectionUI(parent);
+    }
+    
+    private static void WireGameModeSelectionUI(GameModeSelectionUI ui)
+    {
+        var modeButtonParentField = typeof(GameModeSelectionUI).GetField("modeButtonParent", BindingFlags.NonPublic | BindingFlags.Instance);
+        var nameTextField = typeof(GameModeSelectionUI).GetField("selectedModeNameText", BindingFlags.NonPublic | BindingFlags.Instance);
+        var descTextField = typeof(GameModeSelectionUI).GetField("selectedModeDescriptionText", BindingFlags.NonPublic | BindingFlags.Instance);
+        var iconImageField = typeof(GameModeSelectionUI).GetField("selectedModeIconImage", BindingFlags.NonPublic | BindingFlags.Instance);
+        var iconRawImageField = typeof(GameModeSelectionUI).GetField("selectedModeIconRawImage", BindingFlags.NonPublic | BindingFlags.Instance);
+        var confirmButtonField = typeof(GameModeSelectionUI).GetField("confirmModeButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        var backButtonField = typeof(GameModeSelectionUI).GetField("backButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        
+        // Find mode button parent
+        Transform buttonParent = ui.transform.Find("ModeButtonParent");
+        if (buttonParent != null)
+        {
+            modeButtonParentField?.SetValue(ui, buttonParent);
+        }
+        
+        // Find preview panel texts
+        Transform nameText = ui.transform.Find("PreviewPanel/ModeNameText");
+        if (nameText == null) nameText = ui.transform.Find("ModeNameText");
+        if (nameText != null) nameTextField?.SetValue(ui, nameText.GetComponent<TextMeshProUGUI>());
+        
+        Transform descText = ui.transform.Find("PreviewPanel/ModeDescriptionText");
+        if (descText == null) descText = ui.transform.Find("ModeDescriptionText");
+        if (descText != null) descTextField?.SetValue(ui, descText.GetComponent<TextMeshProUGUI>());
+        
+        // Find icon (both Image and RawImage)
+        Transform previewPanel = ui.transform.Find("PreviewPanel");
+        if (previewPanel != null)
+        {
+            Image iconImage = previewPanel.GetComponentInChildren<Image>();
+            if (iconImage != null && iconImage.name.Contains("Icon"))
+            {
+                iconImageField?.SetValue(ui, iconImage);
+            }
+            
+            UnityEngine.UI.RawImage iconRawImage = previewPanel.GetComponentInChildren<UnityEngine.UI.RawImage>();
+            if (iconRawImage != null && iconRawImage.name.Contains("Icon"))
+            {
+                iconRawImageField?.SetValue(ui, iconRawImage);
+            }
+        }
+        
+        // Find buttons
+        Button[] allButtons = ui.GetComponentsInChildren<Button>();
+        foreach (Button btn in allButtons)
+        {
+            if (btn.name.Contains("Confirm") || btn.name.Contains("Start"))
+            {
+                confirmButtonField?.SetValue(ui, btn);
+            }
+            else if (btn.name.Contains("Back"))
+            {
+                backButtonField?.SetValue(ui, btn);
+            }
+        }
+        
+        Debug.Log("✅ GameModeSelectionUI references wired");
+    }
+    
+    private static void WireOrCreateReadyPanel(Transform parent)
+    {
+        GameObject readyPanel = GameObject.Find("ReadyPanel");
+        if (readyPanel != null)
+        {
+            Debug.Log("✅ Found existing ReadyPanel");
+            return;
+        }
+        
+        Debug.Log("🔨 ReadyPanel not found - creating new one");
+        CreateReadyPanel(parent);
+    }
+    
+    private static void WireOrCreateLobbyManager(Transform parent)
+    {
+        LobbyManager existing = Object.FindObjectOfType<LobbyManager>();
+        if (existing != null)
+        {
+            Debug.Log("✅ Found existing LobbyManager - wiring references only");
+            WireLobbyManager(existing);
+            return;
+        }
+        
+        Debug.Log("🔨 LobbyManager not found - creating new one");
+        CreateLobbyManager(parent);
+    }
+    
+    private static void WireLobbyManager(LobbyManager manager)
+    {
+        var roomCreationUIField = typeof(LobbyManager).GetField("roomCreationUI", BindingFlags.NonPublic | BindingFlags.Instance);
+        var playerListUIField = typeof(LobbyManager).GetField("playerListUI", BindingFlags.NonPublic | BindingFlags.Instance);
+        var characterSelectionUIField = typeof(LobbyManager).GetField("characterSelectionUI", BindingFlags.NonPublic | BindingFlags.Instance);
+        var gameModeSelectionUIField = typeof(LobbyManager).GetField("gameModeSelectionUI", BindingFlags.NonPublic | BindingFlags.Instance);
+        var startMatchButtonField = typeof(LobbyManager).GetField("startMatchButton", BindingFlags.NonPublic | BindingFlags.Instance);
+        var readyPanelField = typeof(LobbyManager).GetField("readyPanel", BindingFlags.NonPublic | BindingFlags.Instance);
+        
+        // Find UI components
+        RoomCreationUI roomCreationUI = Object.FindObjectOfType<RoomCreationUI>();
+        PlayerListUI playerListUI = Object.FindObjectOfType<PlayerListUI>();
+        CharacterSelectionUI characterSelectionUI = Object.FindObjectOfType<CharacterSelectionUI>();
+        GameModeSelectionUI gameModeSelectionUI = Object.FindObjectOfType<GameModeSelectionUI>();
+        GameObject readyPanel = GameObject.Find("ReadyPanel");
+        Button startMatchButton = null;
+        if (readyPanel != null)
+        {
+            startMatchButton = readyPanel.GetComponentInChildren<Button>();
+        }
+        
+        roomCreationUIField?.SetValue(manager, roomCreationUI);
+        playerListUIField?.SetValue(manager, playerListUI);
+        characterSelectionUIField?.SetValue(manager, characterSelectionUI);
+        gameModeSelectionUIField?.SetValue(manager, gameModeSelectionUI);
+        startMatchButtonField?.SetValue(manager, startMatchButton);
+        readyPanelField?.SetValue(manager, readyPanel);
+        
+        Debug.Log("✅ LobbyManager references wired");
     }
 }
 #endif

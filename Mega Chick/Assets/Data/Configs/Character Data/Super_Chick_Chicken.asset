@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterName: Super_Chick_Chicken
   description: A character description
-  icon: {fileID: 0}
+  icon: {fileID: 2800000, guid: 51bcbd79069a73c48851689b9f5a4e75, type: 3}
   characterPrefab: {fileID: 9129028186052254398, guid: 06a9bb717955d3a488367d54aa013ebd, type: 3}
   speedMultiplier: 1
   jumpMultiplier: 1

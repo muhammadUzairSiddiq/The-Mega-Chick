@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using TMPro;
 using Photon.Pun;
 using Photon.Realtime;
+using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
@@ -314,19 +315,28 @@ public class RoomCreationUI : MonoBehaviour
         }
         
         // Hide room creation UI - move to character selection
-        if (createRoomPanel != null) createRoomPanel.SetActive(false);
-        if (roomListPanel != null) roomListPanel.SetActive(false);
-        
-        // FORCE SHOW CHARACTER SELECTION
-        if (LobbyManager.Instance != null)
+        if (createRoomPanel != null)
         {
-            LobbyManager.Instance.ForceShowCharacterSelection();
-            LogState("✅ [ACTION] Requested LobbyManager to show character selection");
+            createRoomPanel.SetActive(false);
+            LogState("✅ [UI] CreateRoomPanel deactivated");
         }
         else
         {
-            LogState("❌ [ERROR] LobbyManager.Instance is NULL!");
+            LogState("⚠️ [WARN] createRoomPanel is NULL!");
         }
+        
+        if (roomListPanel != null)
+        {
+            roomListPanel.SetActive(false);
+            LogState("✅ [UI] RoomListPanel deactivated");
+        }
+        
+        // Deactivate entire RoomCreationUI GameObject
+        gameObject.SetActive(false);
+        LogState("✅ [UI] RoomCreationUI GameObject deactivated");
+        
+        // FORCE SHOW CHARACTER SELECTION - Use coroutine to ensure it happens after frame
+        StartCoroutine(DelayedShowCharacterSelection());
         
         SetState(UIState.InRoom);
         LogState("✅ [STATE] Now in room - character selection should be available");
@@ -388,6 +398,36 @@ public class RoomCreationUI : MonoBehaviour
         {
             LogState($"🔄 [STATE] {currentState} → {newState}");
             currentState = newState;
+        }
+    }
+    
+    /// <summary>
+    /// Delayed show character selection (ensures LobbyManager is ready).
+    /// </summary>
+    private IEnumerator DelayedShowCharacterSelection()
+    {
+        yield return null; // Wait one frame
+        
+        // FORCE SHOW CHARACTER SELECTION
+        if (LobbyManager.Instance != null)
+        {
+            LobbyManager.Instance.ForceShowCharacterSelection();
+            LogState("✅ [ACTION] Requested LobbyManager to show character selection");
+        }
+        else
+        {
+            LogState("❌ [ERROR] LobbyManager.Instance is NULL!");
+            // Try to find it
+            LobbyManager found = FindObjectOfType<LobbyManager>();
+            if (found != null)
+            {
+                found.ForceShowCharacterSelection();
+                LogState("✅ [FIX] Found LobbyManager and called ForceShowCharacterSelection");
+            }
+            else
+            {
+                LogState("❌ [ERROR] Could not find LobbyManager in scene!");
+            }
         }
     }
     

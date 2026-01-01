@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   characterName: Super_Chick_Forest
   description: A character description
-  icon: {fileID: 0}
+  icon: {fileID: 2800000, guid: 5a5b31bc728271941825f48ba89155c5, type: 3}
   characterPrefab: {fileID: 5838199019643109518, guid: 960eef9ed3a736d4a8e0cd2c0def1116, type: 3}
   speedMultiplier: 1
   jumpMultiplier: 1

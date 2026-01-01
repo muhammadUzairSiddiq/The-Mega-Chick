@@ -17,7 +17,8 @@ public class GameModeSelectionUI : MonoBehaviour
         public string modeName;
         public string sceneName;
         public string description;
-        public Sprite icon;
+        [Tooltip("Icon - can be Sprite (for Image) or Texture2D (for RawImage)")]
+        public Object icon;
     }
     
     [Header("Game Modes")]
@@ -35,7 +36,8 @@ public class GameModeSelectionUI : MonoBehaviour
     [SerializeField] private GameObject modeButtonPrefab;
     [SerializeField] private TextMeshProUGUI selectedModeNameText;
     [SerializeField] private TextMeshProUGUI selectedModeDescriptionText;
-    [SerializeField] private Image selectedModeIconImage;
+    [SerializeField] private Image selectedModeIconImage; // For Sprite icons
+    [SerializeField] private UnityEngine.UI.RawImage selectedModeIconRawImage; // For Texture2D icons
     [SerializeField] private Button confirmModeButton;
     [SerializeField] private Button backButton; // Back to character selection
     
@@ -248,10 +250,50 @@ public class GameModeSelectionUI : MonoBehaviour
             nameText.text = mode.modeName;
         }
         
-        Image iconImage = buttonObj.GetComponentsInChildren<Image>()[1]; // Second image is icon
-        if (iconImage != null && mode.icon != null)
+        // Handle icon - support both Sprite (Image) and Texture2D (RawImage)
+        if (mode.icon != null)
         {
-            iconImage.sprite = mode.icon;
+            Image[] allImages = buttonObj.GetComponentsInChildren<Image>();
+            UnityEngine.UI.RawImage[] allRawImages = buttonObj.GetComponentsInChildren<UnityEngine.UI.RawImage>();
+            
+            Image iconImage = allImages.Length > 1 ? allImages[1] : null; // Second image is usually icon
+            UnityEngine.UI.RawImage iconRawImage = allRawImages.Length > 0 ? allRawImages[0] : null;
+            
+            if (mode.icon is Sprite spriteIcon)
+            {
+                // Use Image for Sprite
+                if (iconImage != null)
+                {
+                    iconImage.sprite = spriteIcon;
+                    if (iconRawImage != null) iconRawImage.gameObject.SetActive(false);
+                    iconImage.gameObject.SetActive(true);
+                }
+            }
+            else if (mode.icon is Texture2D textureIcon)
+            {
+                // Use RawImage for Texture2D
+                if (iconRawImage != null)
+                {
+                    iconRawImage.texture = textureIcon;
+                    if (iconImage != null) iconImage.gameObject.SetActive(false);
+                    iconRawImage.gameObject.SetActive(true);
+                }
+                else if (iconImage != null)
+                {
+                    // Fallback: create RawImage if it doesn't exist
+                    GameObject rawImageObj = new GameObject("ModeIconRawImage");
+                    rawImageObj.transform.SetParent(iconImage.transform.parent);
+                    RectTransform rawRect = rawImageObj.AddComponent<RectTransform>();
+                    RectTransform imgRect = iconImage.GetComponent<RectTransform>();
+                    rawRect.anchorMin = imgRect.anchorMin;
+                    rawRect.anchorMax = imgRect.anchorMax;
+                    rawRect.anchoredPosition = imgRect.anchoredPosition;
+                    rawRect.sizeDelta = imgRect.sizeDelta;
+                    UnityEngine.UI.RawImage newRawImage = rawImageObj.AddComponent<UnityEngine.UI.RawImage>();
+                    newRawImage.texture = textureIcon;
+                    iconImage.gameObject.SetActive(false);
+                }
+            }
         }
     }
     
@@ -296,12 +338,49 @@ public class GameModeSelectionUI : MonoBehaviour
             LogState("❌ [ERROR] selectedModeDescriptionText is NULL!");
         }
         
-        if (selectedModeIconImage != null && mode.icon != null)
+        // Handle selected mode icon - support both Sprite (Image) and Texture2D (RawImage)
+        if (mode.icon != null)
         {
-            selectedModeIconImage.sprite = mode.icon;
-            LogState("✅ [UI] Icon updated");
+            if (mode.icon is Sprite spriteIcon)
+            {
+                // Use Image for Sprite
+                if (selectedModeIconImage != null)
+                {
+                    selectedModeIconImage.sprite = spriteIcon;
+                    if (selectedModeIconRawImage != null) selectedModeIconRawImage.gameObject.SetActive(false);
+                    selectedModeIconImage.gameObject.SetActive(true);
+                    LogState("✅ [UI] Icon updated (Sprite)");
+                }
+            }
+            else if (mode.icon is Texture2D textureIcon)
+            {
+                // Use RawImage for Texture2D
+                if (selectedModeIconRawImage != null)
+                {
+                    selectedModeIconRawImage.texture = textureIcon;
+                    if (selectedModeIconImage != null) selectedModeIconImage.gameObject.SetActive(false);
+                    selectedModeIconRawImage.gameObject.SetActive(true);
+                    LogState("✅ [UI] Icon updated (Texture2D)");
+                }
+                else if (selectedModeIconImage != null)
+                {
+                    // Fallback: create RawImage if it doesn't exist
+                    GameObject rawImageObj = new GameObject("SelectedModeIconRawImage");
+                    rawImageObj.transform.SetParent(selectedModeIconImage.transform.parent);
+                    RectTransform rawRect = rawImageObj.AddComponent<RectTransform>();
+                    RectTransform imgRect = selectedModeIconImage.GetComponent<RectTransform>();
+                    rawRect.anchorMin = imgRect.anchorMin;
+                    rawRect.anchorMax = imgRect.anchorMax;
+                    rawRect.anchoredPosition = imgRect.anchoredPosition;
+                    rawRect.sizeDelta = imgRect.sizeDelta;
+                    UnityEngine.UI.RawImage newRawImage = rawImageObj.AddComponent<UnityEngine.UI.RawImage>();
+                    newRawImage.texture = textureIcon;
+                    selectedModeIconImage.gameObject.SetActive(false);
+                    LogState("✅ [UI] Icon updated (Texture2D - created RawImage)");
+                }
+            }
         }
-        else if (selectedModeIconImage != null && mode.icon == null)
+        else
         {
             LogState("⚠️ [WARN] Icon is NULL for this mode");
         }

@@ -155,10 +155,110 @@ public class PlayerListUI : MonoBehaviour
             }
         }
         
-        // Character icon (second image, skip first which is usually background)
-        if (allImages.Length > 1 && characterData != null && characterData.icon != null)
+        // Character icon - Support both Sprite (Image) and Texture2D (RawImage)
+        if (characterData != null && characterData.icon != null)
         {
-            allImages[1].sprite = characterData.icon;
+            // Find CharacterIcon GameObject by name (more reliable)
+            Transform iconObj = entryObj.transform.Find("CharacterIcon");
+            Image iconImage = null;
+            UnityEngine.UI.RawImage iconRawImage = null;
+            
+            if (iconObj != null)
+            {
+                iconImage = iconObj.GetComponent<Image>();
+                iconRawImage = iconObj.GetComponent<UnityEngine.UI.RawImage>();
+            }
+            else
+            {
+                // Fallback: try to find by second image (skip first which is usually background)
+                if (allImages.Length > 1)
+                {
+                    iconImage = allImages[1];
+                    iconObj = iconImage.transform;
+                }
+                else if (allImages.Length > 0)
+                {
+                    iconImage = allImages[0];
+                    iconObj = iconImage.transform;
+                }
+                
+                // Try to find RawImage
+                if (iconObj != null)
+                {
+                    iconRawImage = iconObj.GetComponent<UnityEngine.UI.RawImage>();
+                }
+            }
+            
+            // Check if it's a Sprite
+            Sprite spriteIcon = characterData.icon as Sprite;
+            if (spriteIcon != null)
+            {
+                // Use Image for Sprite
+                if (iconImage != null)
+                {
+                    iconImage.sprite = spriteIcon;
+                    iconImage.color = Color.white;
+                    iconImage.enabled = true;
+                    iconImage.gameObject.SetActive(true);
+                    if (iconRawImage != null)
+                    {
+                        iconRawImage.enabled = false;
+                        iconRawImage.gameObject.SetActive(false);
+                    }
+                    Log($"✅ [PLAYER LIST] Icon set (Sprite): {spriteIcon.name}");
+                }
+                else
+                {
+                    Log($"⚠️ [WARN] Could not find Image component for character icon in player entry!");
+                }
+            }
+            // Check if it's a Texture2D
+            else if (characterData.icon is Texture2D textureIcon)
+            {
+                // Use RawImage for Texture2D
+                if (iconRawImage != null)
+                {
+                    iconRawImage.texture = textureIcon;
+                    iconRawImage.color = Color.white;
+                    iconRawImage.enabled = true;
+                    iconRawImage.gameObject.SetActive(true);
+                    if (iconImage != null)
+                    {
+                        iconImage.enabled = false;
+                        iconImage.gameObject.SetActive(false);
+                    }
+                    Log($"✅ [PLAYER LIST] Icon set (Texture2D): {textureIcon.name}");
+                }
+                else if (iconObj != null && iconImage == null)
+                {
+                    // Only create RawImage if Image doesn't exist (can't have both on same GameObject)
+                    iconRawImage = iconObj.gameObject.AddComponent<UnityEngine.UI.RawImage>();
+                    iconRawImage.texture = textureIcon;
+                    iconRawImage.color = Color.white;
+                    iconRawImage.enabled = true;
+                    Log($"✅ [PLAYER LIST] Created RawImage and set texture: {textureIcon.name}");
+                }
+                else
+                {
+                    // Can't add RawImage when Image exists or iconObj is null - skip Texture2D for player list
+                    if (iconImage != null)
+                    {
+                        Log($"⚠️ [WARN] Cannot add RawImage - Image component already exists. Player list only supports Sprite icons.");
+                    }
+                    else
+                    {
+                        Log($"⚠️ [WARN] Could not find icon GameObject for Texture2D icon!");
+                    }
+                }
+            }
+            else
+            {
+                Log($"⚠️ [WARN] Icon type not supported: {characterData.icon.GetType().Name}. Expected Sprite or Texture2D.");
+            }
+        }
+        else
+        {
+            Log($"⚠️ [WARN] Character icon is NULL for player entry!");
         }
         
         // Master client indicator

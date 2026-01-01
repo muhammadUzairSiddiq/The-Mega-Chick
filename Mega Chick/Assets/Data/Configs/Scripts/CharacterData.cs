@@ -16,8 +16,8 @@ public class CharacterData : ScriptableObject
     [TextArea(2, 4)]
     public string description = "A character description";
     
-    [Tooltip("Character icon/sprite for selection UI")]
-    public Sprite icon;
+    [Tooltip("Character icon - can be Sprite (for Image) or Texture2D (for RawImage)")]
+    public Object icon;
     
     [Header("Character Model")]
     [Tooltip("Character prefab/model to use")]
