@@ -99,13 +99,14 @@ public class PlayerAnimatorController : MonoBehaviour
     
     /// <summary>
     /// Update animations based on movement input.
-    /// SIMPLE LOGIC:
+    /// NEW LOGIC:
+    /// - W + Space (hold) = Jump animation while space held, then idle/run when released
+    /// - Space (press) = Jump animation
     /// - Hold WASD = Run animation
     /// - SHIFT + W = Sprint animation
-    /// - Press Space = Jump animation (then back to idle/run)
     /// - No input = Idle animation
     /// </summary>
-    public void UpdateAnimations(Vector2 moveInput, bool isGrounded, bool justJumped, bool isSprinting = false, bool isInJumpState = false)
+    public void UpdateAnimations(Vector2 moveInput, bool isGrounded, bool justJumped, bool isSprinting = false, bool isInJumpState = false, bool jumpHeld = false)
     {
         if (animator == null) return;
         
@@ -115,18 +116,22 @@ public class PlayerAnimatorController : MonoBehaviour
             jumpAnimationTimer = JUMP_ANIMATION_DURATION;
         }
         
-        // Show jump animation briefly when jumping starts, but don't block other animations
-        if (justJumped)
+        // NEW: If space is held, show jump animation (W + Space hold = jump animation)
+        if (jumpHeld)
         {
-            // Show jump animation when jump is pressed
             SetAnimation(jumpAnimationID);
-            return; // Show jump animation briefly
+            return; // Exit early - jump animation while space is held
         }
         
-        // After brief jump animation, allow other animations even if in air
-        // This prevents jump from blocking other animations unnecessarily
+        // If in jump state (in air) or jump animation timer active, show jump animation
+        if (isInJumpState || jumpAnimationTimer > 0f)
+        {
+            // Show jump animation - this is the ONLY animation during jump state
+            SetAnimation(jumpAnimationID);
+            return; // Exit early - no other animations while jumping
+        }
         
-        // Only show these animations when GROUNDED (not in jump state)
+        // Only show these animations when GROUNDED (not in jump state) and space not held
         if (isSprinting && moveInput.y > 0.1f)
         {
             // SHIFT + W = Sprint animation

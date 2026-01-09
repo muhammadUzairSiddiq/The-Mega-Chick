@@ -102,7 +102,11 @@ public class AIBotController : MonoBehaviour
         // Update animations
         if (animatorController != null)
         {
-            animatorController.UpdateAnimations(aiMoveInput, isGrounded, isJumping);
+            bool justJumped = false; // AI doesn't track justJumped separately
+            bool isSprinting = false; // AI doesn't sprint
+            bool isInJumpState = isJumping; // Use isJumping as jump state
+            bool jumpHeld = isJumping; // AI holds jump while jumping
+            animatorController.UpdateAnimations(aiMoveInput, isGrounded, justJumped, isSprinting, isInJumpState, jumpHeld);
         }
     }
     

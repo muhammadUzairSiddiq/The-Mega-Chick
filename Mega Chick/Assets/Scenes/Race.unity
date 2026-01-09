@@ -8076,7 +8076,7 @@ MonoBehaviour:
   followSmoothness: 5
   rotationSmoothness: 3
   countdownText: {fileID: 887169730}
-  countdownDuration: 4
+  countdownDuration: 2
   logEvents: 1
 --- !u!1 &374847735
 GameObject:
@@ -49996,7 +49996,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &2127762006
 Transform:
   m_ObjectHideFlags: 0

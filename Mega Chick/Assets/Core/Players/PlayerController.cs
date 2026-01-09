@@ -43,7 +43,6 @@ public class PlayerController : MonoBehaviour
     private float gravityDisabledTimer = 0f;
     private bool isSprinting = false;
     private bool isInJumpState = false; // Track if player is in jump/air state
-    private const float SPRINT_SPEED_MULTIPLIER = 1.5f; // Sprint is 1.5x normal speed
     private const float FALL_GRAVITY_MULTIPLIER = 2.5f; // Faster fall for realistic jump
     private bool inputEnabled = false; // Control input during intro sequence - DISABLED BY DEFAULT
     
@@ -272,10 +271,10 @@ public class PlayerController : MonoBehaviour
             isInJumpState = true; // Enter jump state
         }
         
-        // Update animations: Only jump animation during jump state, otherwise run/idle/sprint
+        // Update animations: Jump animation when space is held or just pressed, otherwise run/idle/sprint
         if (animatorController != null)
         {
-            animatorController.UpdateAnimations(moveInput, isGrounded, justJumped, isSprinting, isInJumpState);
+            animatorController.UpdateAnimations(moveInput, isGrounded, justJumped, isSprinting, isInJumpState, jumpHeld);
         }
         
         // Handle attack
@@ -372,10 +371,10 @@ public class PlayerController : MonoBehaviour
         
         // Calculate horizontal velocity (X and Z ONLY, Y is ZERO)
         float baseSpeed = movementConfig.moveSpeed;
-        // Apply sprint multiplier if sprinting
+        // Use sprint speed if sprinting
         if (isSprinting && isGrounded)
         {
-            baseSpeed *= SPRINT_SPEED_MULTIPLIER;
+            baseSpeed = movementConfig.sprintSpeed;
         }
         float moveSpeed = baseSpeed * controlFactor;
         

@@ -13,6 +13,10 @@ public class MovementConfig : ScriptableObject
     [Range(1f, 20f)]
     public float moveSpeed = 5f;
     
+    [Tooltip("Sprint speed (units per second) - speed when holding SHIFT + W")]
+    [Range(1f, 30f)]
+    public float sprintSpeed = 7.5f;
+    
     [Tooltip("Rotation speed (degrees per second) for left/right turning")]
     [Range(30f, 360f)]
     public float rotationSpeed = 120f;

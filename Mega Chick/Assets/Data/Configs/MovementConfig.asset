@@ -12,8 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b8548a6f58208b647b77c73dd93c70d8, type: 3}
   m_Name: MovementConfig
   m_EditorClassIdentifier: 
-  moveSpeed: 5
+  moveSpeed: 10
+  sprintSpeed: 15
+  rotationSpeed: 120
   jumpForce: 8
+  jumpTotalSpeed: 0.3
+  jumpHeightSpeed: 0.6
   gravityScale: 1
   airControl: 0.5
   knockbackForce: 10
