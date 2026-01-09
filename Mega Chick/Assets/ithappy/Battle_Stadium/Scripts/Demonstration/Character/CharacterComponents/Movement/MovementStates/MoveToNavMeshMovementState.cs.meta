@@ -1,0 +1,10 @@
+fileFormatVersion: 2
+guid: c6eee26493e04548bc161b14208ec26b
+timeCreated: 1745936932
+AssetOrigin:
+  serializedVersion: 1
+  productId: 304365
+  packageName: Battle Stadium - Low Poly 3D Models Pack
+  packageVersion: 1.1
+  assetPath: Assets/ithappy/Battle_Stadium/Scripts/Demonstration/Character/CharacterComponents/Movement/MovementStates/MoveToNavMeshMovementState.cs
+  uploadId: 840898

@@ -62,6 +62,9 @@ public class CreateManagerPrefabs : EditorWindow
         // Create CharacterSelectionManager prefab
         CreateCharacterSelectionManagerPrefab(prefabPath);
         
+        // Create CharacterLoader prefab
+        CreateCharacterLoaderPrefab(prefabPath);
+        
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();
         
@@ -74,7 +77,8 @@ public class CreateManagerPrefabs : EditorWindow
             "• RoomManager → NetworkConfig\n" +
             "• MatchFlowController → MatchConfig\n" +
             "• SpawnManager → Player Prefab\n" +
-            "• CharacterSelectionManager → (assign CharacterData assets manually)", 
+            "• CharacterSelectionManager → (auto-loaded CharacterData assets)\n" +
+            "• CharacterLoader → (ready to drag into game scenes)", 
             "OK");
     }
     
@@ -302,6 +306,34 @@ public class CreateManagerPrefabs : EditorWindow
         }
         
         Debug.Log($"✅ CharacterSelectionManager prefab ready at {prefabPath}");
+    }
+    
+    private static void CreateCharacterLoaderPrefab(string path)
+    {
+        string prefabPath = $"{path}/CharacterLoader.prefab";
+        
+        GameObject prefab;
+        CharacterLoader loader;
+        
+        if (File.Exists(prefabPath))
+        {
+            Debug.Log($"⏭️  CharacterLoader prefab already exists, updating...");
+            prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            loader = prefab.GetComponent<CharacterLoader>();
+            if (loader == null)
+            {
+                loader = prefab.AddComponent<CharacterLoader>();
+            }
+        }
+        else
+        {
+            GameObject go = new GameObject("CharacterLoader");
+            loader = go.AddComponent<CharacterLoader>();
+            prefab = PrefabUtility.SaveAsPrefabAsset(go, prefabPath);
+            DestroyImmediate(go);
+        }
+        
+        Debug.Log($"✅ CharacterLoader prefab ready at {prefabPath}");
     }
     
     /// <summary>

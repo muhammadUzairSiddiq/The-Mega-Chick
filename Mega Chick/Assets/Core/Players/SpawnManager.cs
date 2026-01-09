@@ -1,6 +1,7 @@
 #if PUN_2_OR_NEWER
 using UnityEngine;
 using Photon.Pun;
+using System.Collections;
 using System.Collections.Generic;
 
 /// <summary>
@@ -18,6 +19,17 @@ public class SpawnManager : MonoBehaviourPunCallbacks
     
     [Header("Player Prefab")]
     [SerializeField] private GameObject playerPrefab;
+    
+    [Header("Character Spawning")]
+    [Tooltip("If true, spawns complete character prefabs from CharacterData instead of generic player prefab")]
+    [SerializeField] private bool useCharacterPrefabs = true;
+    
+    [Tooltip("Auto-load characters when players spawn (uses CharacterLoader if available)")]
+    [SerializeField] private bool autoLoadOnSpawn = true;
+    
+    [Header("Spawn Delay")]
+    [Tooltip("Delay in seconds before spawning players when scene starts (default: 5 seconds)")]
+    [SerializeField] private float spawnDelay = 5f;
     
     [Header("Debug")]
     [SerializeField] private bool logSpawnEvents = true;
@@ -37,11 +49,36 @@ public class SpawnManager : MonoBehaviourPunCallbacks
     }
     
     /// <summary>
+    /// Called when scene is loaded - spawn players if match is already playing.
+    /// </summary>
+    public override void OnJoinedRoom()
+    {
+        base.OnJoinedRoom();
+        
+        // Check if match is already in Playing state when we join
+        if (MatchFlowController.Instance != null)
+        {
+            MatchState currentState = MatchFlowController.Instance.GetCurrentState();
+            if (currentState == MatchState.Playing)
+            {
+                Debug.Log($"[SpawnManager] Match already in Playing state - spawning players with {spawnDelay}s delay");
+                if (PhotonNetwork.IsMasterClient)
+                {
+                    SpawnAllPlayers(MatchState.Playing);
+                }
+            }
+        }
+    }
+    
+    /// <summary>
     /// Spawn all players for current mode.
     /// Called by Master Client when match starts.
+    /// Will wait for spawnDelay seconds before actually spawning.
     /// </summary>
     public void SpawnAllPlayers(MatchState matchState)
     {
+        Debug.Log($"[SpawnManager] 🎯 SpawnAllPlayers() called! Delay: {spawnDelay} seconds");
+        
         if (!PhotonNetwork.IsMasterClient)
         {
             Log("Only Master Client can spawn players!");
@@ -54,12 +91,30 @@ public class SpawnManager : MonoBehaviourPunCallbacks
             return;
         }
         
+        // Start coroutine to spawn after delay
+        Debug.Log($"[SpawnManager] 🚀 Starting delayed spawn coroutine...");
+        StartCoroutine(SpawnAllPlayersDelayed(matchState));
+    }
+    
+    /// <summary>
+    /// Spawn all players after delay.
+    /// </summary>
+    private IEnumerator SpawnAllPlayersDelayed(MatchState matchState)
+    {
+        Log($"⏳ [DELAY] Waiting {spawnDelay} seconds before spawning players...");
+        Debug.Log($"[SpawnManager] ⏳ DELAY: Waiting {spawnDelay} seconds before spawning players...");
+        
+        // Wait for spawn delay
+        yield return new WaitForSeconds(spawnDelay);
+        
+        Debug.Log($"[SpawnManager] ✅ DELAY COMPLETE: Now spawning players...");
+        
         List<Transform> spawnPoints = GetSpawnPointsForMode(matchState);
         
         if (spawnPoints.Count == 0)
         {
             Log("No spawn points available!");
-            return;
+            yield break;
         }
         
         // Get all players in room
@@ -121,17 +176,45 @@ public class SpawnManager : MonoBehaviourPunCallbacks
         // Store spawn assignment
         playerSpawnAssignments[player.ActorNumber] = spawnPoint;
         
-        // Spawn via Photon (all clients will instantiate)
-        GameObject playerObj = PhotonNetwork.Instantiate(
-            playerPrefab.name,
-            spawnPoint.position,
-            spawnPoint.rotation,
-            0,
-            new object[] { player.ActorNumber }
-        );
+        GameObject playerObj = null;
         
-        // Apply character selection
-        ApplyCharacterToPlayer(playerObj, player);
+        // Use CharacterSpawner if enabled and available
+        if (useCharacterPrefabs && CharacterSpawner.Instance != null)
+        {
+            playerObj = CharacterSpawner.Instance.SpawnCharacter(
+                player,
+                spawnPoint.position,
+                spawnPoint.rotation
+            );
+        }
+        
+        // Fallback to generic player prefab
+        if (playerObj == null)
+        {
+            if (playerPrefab == null)
+            {
+                Log($"No player prefab assigned and CharacterSpawner failed for player {player.ActorNumber}!");
+                return;
+            }
+            
+            // Spawn via Photon (all clients will instantiate)
+            playerObj = PhotonNetwork.Instantiate(
+                playerPrefab.name,
+                spawnPoint.position,
+                spawnPoint.rotation,
+                0,
+                new object[] { player.ActorNumber }
+            );
+            
+            // Apply character selection (for generic prefab system)
+            ApplyCharacterToPlayer(playerObj, player);
+        }
+        
+        // Let CharacterLoader handle character loading if available
+        if (CharacterLoader.Instance != null && autoLoadOnSpawn)
+        {
+            CharacterLoader.Instance.LoadCharacterForPlayer(playerObj, player);
+        }
         
         Log($"Spawned player {player.ActorNumber} at {spawnPoint.position}");
     }
@@ -161,7 +244,19 @@ public class SpawnManager : MonoBehaviourPunCallbacks
             return;
         }
         
-        // Find player object
+        // Use CharacterSpawner if enabled and available
+        if (useCharacterPrefabs && CharacterSpawner.Instance != null)
+        {
+            CharacterSpawner.Instance.RespawnCharacter(
+                actorNumber,
+                spawnPoint.position,
+                spawnPoint.rotation
+            );
+            Log($"Respawned player {actorNumber} using CharacterSpawner at {spawnPoint.position}");
+            return;
+        }
+        
+        // Fallback: Reset position of existing player object
         GameObject playerObj = FindPlayerObject(actorNumber);
         if (playerObj != null)
         {

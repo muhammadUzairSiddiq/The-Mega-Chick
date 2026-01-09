@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 4790c0b5671d4c6ca5da7ce6b92bae70
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 304365
+  packageName: Battle Stadium - Low Poly 3D Models Pack
+  packageVersion: 1.1
+  assetPath: Assets/ithappy/Battle_Stadium/Scripts/Demonstration/Editor/SplinePatrolCharacterEditor.cs
+  uploadId: 840898

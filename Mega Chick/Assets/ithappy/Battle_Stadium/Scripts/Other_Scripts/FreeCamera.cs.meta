@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: ad522991c31442b3bec2282b7ab19f2d
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 304365
+  packageName: Battle Stadium - Low Poly 3D Models Pack
+  packageVersion: 1.1
+  assetPath: Assets/ithappy/Battle_Stadium/Scripts/Other_Scripts/FreeCamera.cs
+  uploadId: 840898
