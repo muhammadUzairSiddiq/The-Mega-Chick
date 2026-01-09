@@ -41,10 +41,8 @@ public class PlayerController : MonoBehaviour
     private bool wasGrounded; // Track previous grounded state
     private float lastAttackTime;
     private float gravityDisabledTimer = 0f;
-    private const float GRAVITY_DISABLE_DURATION = 0.3f; // Quick jump - 0.3 seconds
     private bool isSprinting = false;
     private bool isInJumpState = false; // Track if player is in jump/air state
-    private const float ROTATION_SPEED = 5f; // Smooth human-like rotation speed
     private const float SPRINT_SPEED_MULTIPLIER = 1.5f; // Sprint is 1.5x normal speed
     private const float FALL_GRAVITY_MULTIPLIER = 2.5f; // Faster fall for realistic jump
     private bool inputEnabled = false; // Control input during intro sequence - DISABLED BY DEFAULT
@@ -196,11 +194,27 @@ public class PlayerController : MonoBehaviour
         // Get input (WASD + Space + Shift) - ONLY if input is enabled
         if (inputEnabled)
         {
-            moveInput = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+            // NEW: A/D rotates left/right, only W moves forward (no strafing)
+            float horizontalInput = Input.GetAxisRaw("Horizontal"); // A/D for rotation
+            float verticalInput = Input.GetAxisRaw("Vertical"); // W/S for forward/back
+            
             // REMOVE S key (backward) - clamp Y to 0 minimum (only forward movement)
-            if (moveInput.y < 0f)
+            if (verticalInput < 0f)
             {
-                moveInput.y = 0f;
+                verticalInput = 0f;
+            }
+            
+            // Movement input: only forward (W), no horizontal strafing
+            moveInput = new Vector2(0f, verticalInput);
+            
+            // Rotation input: A/D for left/right rotation
+            float rotationInput = horizontalInput;
+            
+            // Apply rotation if A/D is pressed
+            if (Mathf.Abs(rotationInput) > 0.1f && movementConfig != null)
+            {
+                float rotationAmount = rotationInput * movementConfig.rotationSpeed * Time.deltaTime;
+                transform.Rotate(0f, rotationAmount, 0f, Space.Self);
             }
             
             // Sprint check: SHIFT + W (forward)
@@ -334,44 +348,9 @@ public class PlayerController : MonoBehaviour
             return;
         }
         
-        // Get camera forward and right vectors
-        Vector3 cameraForward = Vector3.forward;
-        Vector3 cameraRight = Vector3.right;
-        
-        if (playerCamera != null)
-        {
-            cameraForward = playerCamera.transform.forward;
-            cameraRight = playerCamera.transform.right;
-        }
-        
-        // CRITICAL: Flatten to ground plane (remove Y component completely)
-        cameraForward.y = 0f;
-        cameraRight.y = 0f;
-        
-        // Normalize after flattening
-        float forwardMag = cameraForward.magnitude;
-        float rightMag = cameraRight.magnitude;
-        
-        if (forwardMag > 0.01f)
-        {
-            cameraForward /= forwardMag; // Normalize manually
-        }
-        else
-        {
-            cameraForward = Vector3.forward;
-        }
-        
-        if (rightMag > 0.01f)
-        {
-            cameraRight /= rightMag; // Normalize manually
-        }
-        else
-        {
-            cameraRight = Vector3.right;
-        }
-        
-        // Calculate movement direction (horizontal only) - NO Y COMPONENT
-        Vector3 moveDirection = (cameraForward * moveInput.y + cameraRight * moveInput.x);
+        // Calculate movement direction - only forward (player's forward direction)
+        // Since A/D now rotates the player, movement is always in the player's forward direction
+        Vector3 moveDirection = transform.forward * moveInput.y;
         moveDirection.y = 0f; // Force Y to zero BEFORE normalizing
         
         // Normalize horizontal direction
@@ -414,27 +393,24 @@ public class PlayerController : MonoBehaviour
         // CRITICAL: Apply ONLY horizontal movement, preserve Y velocity from gravity/jump
         rb.linearVelocity = new Vector3(smoothVelocity.x, currentYVelocity, smoothVelocity.z);
         
-        // Face movement direction (only if moving) - SMOOTH HUMAN-LIKE ROTATION
-        if (moveMag > 0.1f)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.fixedDeltaTime * ROTATION_SPEED);
-        }
+        // Rotation is now handled in Update() when A/D is pressed
+        // No need to face movement direction here since player rotates with A/D
     }
     
     /// <summary>
-    /// Jump action - apply upward force and disable gravity temporarily.
+    /// Jump action - apply upward force with configurable speed and height.
     /// </summary>
     private void Jump()
     {
         if (movementConfig == null || rb == null) return;
         
-        // Apply jump force
-        rb.linearVelocity = new Vector3(rb.linearVelocity.x, movementConfig.jumpForce, rb.linearVelocity.z);
+        // Apply jump force with height speed multiplier (lower = less high)
+        float adjustedJumpForce = movementConfig.jumpForce * movementConfig.jumpHeightSpeed;
+        rb.linearVelocity = new Vector3(rb.linearVelocity.x, adjustedJumpForce, rb.linearVelocity.z);
         
-        // DISABLE gravity for 1-2 seconds during jump
+        // DISABLE gravity for shorter duration (faster jump) based on jumpTotalSpeed
         rb.useGravity = false;
-        gravityDisabledTimer = GRAVITY_DISABLE_DURATION;
+        gravityDisabledTimer = movementConfig.jumpTotalSpeed;
     }
     
     /// <summary>

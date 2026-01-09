@@ -31,6 +31,9 @@ public class CameraIntroController : MonoBehaviour
     [Tooltip("Offset from player position (X, Y, Z)")]
     [SerializeField] private Vector3 followOffset = new Vector3(0f, 5f, -10f);
     
+    [Tooltip("Rotation offset (X, Y, Z in degrees) - applied to camera rotation")]
+    [SerializeField] private Vector3 rotationOffset = new Vector3(0f, 0f, 0f);
+    
     [Tooltip("Smooth follow speed (higher = faster, lower = smoother)")]
     [SerializeField] private float followSmoothness = 5f;
     
@@ -306,8 +309,10 @@ public class CameraIntroController : MonoBehaviour
             
             // Smooth interpolation
             mainCamera.transform.position = Vector3.Lerp(startPos, currentTargetPos, t);
-            directionToPlayer = (target.position - mainCamera.transform.position).normalized;
-            targetRotation = Quaternion.LookRotation(directionToPlayer);
+            // Follow player's rotation with offset (for consistency with gameplay follow)
+            Quaternion playerRot = target.rotation;
+            Quaternion offsetRot = Quaternion.Euler(rotationOffset);
+            targetRotation = playerRot * offsetRot;
             mainCamera.transform.rotation = Quaternion.Slerp(startRot, targetRotation, t);
             
             yield return null;
@@ -316,8 +321,10 @@ public class CameraIntroController : MonoBehaviour
         // Ensure exact position
         offsetWorld = target.TransformDirection(followOffset);
         targetFollowPosition = target.position + offsetWorld;
-        directionToPlayer = (target.position - targetFollowPosition).normalized;
-        targetRotation = Quaternion.LookRotation(directionToPlayer);
+        // Follow player's rotation with offset
+        Quaternion finalPlayerRot = target.rotation;
+        Quaternion finalOffsetRot = Quaternion.Euler(rotationOffset);
+        targetRotation = finalPlayerRot * finalOffsetRot;
         mainCamera.transform.position = targetFollowPosition;
         mainCamera.transform.rotation = targetRotation;
         
@@ -451,9 +458,12 @@ public class CameraIntroController : MonoBehaviour
             Time.deltaTime * followSmoothness
         );
         
-        // Smooth rotation (look at player)
-        Vector3 directionToPlayer = (target.position - mainCamera.transform.position).normalized;
-        Quaternion targetRotation = Quaternion.LookRotation(directionToPlayer);
+        // Smooth rotation - follow player's rotation with offset
+        // Camera rotates to match player's forward direction, then applies offset
+        Quaternion playerRotation = target.rotation;
+        Quaternion offsetRotation = Quaternion.Euler(rotationOffset);
+        Quaternion targetRotation = playerRotation * offsetRotation;
+        
         mainCamera.transform.rotation = Quaternion.Slerp(
             mainCamera.transform.rotation,
             targetRotation,

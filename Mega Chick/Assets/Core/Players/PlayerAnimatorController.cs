@@ -50,7 +50,7 @@ public class PlayerAnimatorController : MonoBehaviour
     private const string ANIMATION_PARAMETER = "animation";
     private int currentAnimationID = 0;
     private float jumpAnimationTimer = 0f;
-    private const float JUMP_ANIMATION_DURATION = 0.5f; // How long to show jump animation
+    private const float JUMP_ANIMATION_DURATION = 0.2f; // How long to show jump animation (shorter - doesn't block other animations)
     
     private void Awake()
     {
@@ -115,13 +115,16 @@ public class PlayerAnimatorController : MonoBehaviour
             jumpAnimationTimer = JUMP_ANIMATION_DURATION;
         }
         
-        // CRITICAL: If in jump state (in air), ONLY show jump animation - no running/idle
-        if (isInJumpState || jumpAnimationTimer > 0f)
+        // Show jump animation briefly when jumping starts, but don't block other animations
+        if (justJumped)
         {
-            // Show jump animation - this is the ONLY animation during jump state
+            // Show jump animation when jump is pressed
             SetAnimation(jumpAnimationID);
-            return; // Exit early - no other animations while jumping
+            return; // Show jump animation briefly
         }
+        
+        // After brief jump animation, allow other animations even if in air
+        // This prevents jump from blocking other animations unnecessarily
         
         // Only show these animations when GROUNDED (not in jump state)
         if (isSprinting && moveInput.y > 0.1f)

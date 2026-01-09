@@ -13,9 +13,22 @@ public class MovementConfig : ScriptableObject
     [Range(1f, 20f)]
     public float moveSpeed = 5f;
     
-    [Tooltip("Force applied when jumping")]
-    [Range(5f, 20f)]
-    public float jumpForce = 8f;
+    [Tooltip("Rotation speed (degrees per second) for left/right turning")]
+    [Range(30f, 360f)]
+    public float rotationSpeed = 120f;
+    
+    [Header("Jump Settings")]
+    [Tooltip("Force applied when jumping (controls jump height)")]
+    [Range(3f, 15f)]
+    public float jumpForce = 5f;
+    
+    [Tooltip("Jump total speed (how fast the jump completes) - lower = faster jump")]
+    [Range(0.1f, 2f)]
+    public float jumpTotalSpeed = 0.3f;
+    
+    [Tooltip("Jump height speed multiplier (affects vertical velocity) - lower = less high")]
+    [Range(0.1f, 2f)]
+    public float jumpHeightSpeed = 0.6f;
     
     [Tooltip("Gravity multiplier (1 = normal, 2 = double gravity)")]
     [Range(0.1f, 5f)]
